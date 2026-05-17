@@ -1,0 +1,22 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.5
+python-dotenv>=1.0
+loguru>=0.7
+
+# ML — GPU varsa CUDA build, yoksa CPU fallback
+torch>=2.4
+transformers>=4.45
+accelerate>=1.0
+sentencepiece>=0.2
+peft>=0.13                  # LoRA adapter yükleme (FinGPT bunları kullanıyor)
+bitsandbytes>=0.44 ; platform_system=="Linux"   # 4-bit quantization (GPU only)
+safetensors>=0.4
+
+# RAG
+langchain>=0.3
+langchain-community>=0.3
+sentence-transformers>=3.0
+faiss-cpu>=1.8              # SEC filings vektör index
+sec-edgar-downloader>=5.0   # 10-K/10-Q indirme
