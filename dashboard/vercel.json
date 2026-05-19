@@ -6,10 +6,6 @@
   "installCommand": "npm install",
   "outputDirectory": ".next",
   "regions": ["fra1"],
-  "env": {
-    "BACKEND_API_URL": "@backend_api_url",
-    "API_BEARER_TOKEN": "@api_bearer_token"
-  },
   "headers": [
     {
       "source": "/(.*)",
