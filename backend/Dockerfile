@@ -21,13 +21,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# pyproject.toml'ı önce kopyala (Docker cache layer)
+# pyproject.toml'ı önce kopyala — bağımlılık katmanı cache için
 COPY pyproject.toml /app/
 
-# Production bağımlılıkları yükle — NLP/torch extras yüklenmez
-RUN pip install -e .
+# Editable install setuptools'tan src/ ister; gerçek kod COPY edilmeden
+# önce minimal bir kabuk oluşturup deps katmanını cache'liyoruz.
+RUN mkdir -p /app/src/finllm && touch /app/src/finllm/__init__.py \
+    && pip install -e .
 
-# App code
+# Gerçek uygulama kodu (önceki mock src'i override eder)
 COPY src /app/src
 COPY scripts /app/scripts
 
