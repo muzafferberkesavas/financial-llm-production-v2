@@ -1,0 +1,48 @@
+# Caddy reverse proxy — otomatik Let's Encrypt SSL
+#
+# DOMAIN değişkeni .env'den okunur. Örnek değerler:
+#   - api.finllm.app           (kendi domain'in)
+#   - 13-50-99-239.nip.io      (domain yokken: <eip-tireli>.nip.io otomatik resolve eder)
+#
+# nip.io hem public DNS'te resolve olur hem de Let's Encrypt cert çıkartabilir.
+
+{$DOMAIN} {
+    encode gzip zstd
+
+    # FastAPI'ye proxy
+    reverse_proxy api:8000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # WebSocket için ekstra
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket api:8000
+
+    # Güvenlik başlıkları
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        # CORS — dashboard origin'ini buraya ekle (Vercel deploy sonrası)
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET,POST,OPTIONS"
+        Access-Control-Allow-Headers "Authorization,Content-Type"
+    }
+
+    # OPTIONS pre-flight
+    @options method OPTIONS
+    respond @options 204
+
+    # Health check log'unu kıs
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+}

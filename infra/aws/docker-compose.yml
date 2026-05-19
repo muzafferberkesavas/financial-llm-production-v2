@@ -1,0 +1,96 @@
+# FinLLM — AWS EC2 single-host deployment
+# Postgres + FastAPI + Telegram DM bot + Caddy reverse proxy
+#
+# Kullanım (EC2 üzerinde):
+#   cd /home/ubuntu/financial-llm-production/infra/aws
+#   cp .env.example .env && nano .env   # secrets'ı doldur
+#   docker compose up -d --build
+#   docker compose ps
+#   docker compose logs -f api
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finllm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-finllm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-finllm}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      # Sadece localhost — internete açık değil
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finllm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finllm
+
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    image: finllm-backend:latest
+    container_name: finllm-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MODE: api
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-finllm}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finllm}"
+      ENV: production
+      PUBLIC_READ: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - finllm
+
+  telegram-dm:
+    image: finllm-backend:latest
+    container_name: finllm-telegram-dm
+    restart: unless-stopped
+    command: python /app/scripts/telegram_dm_bot.py
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-finllm}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finllm}"
+      ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - finllm
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: finllm-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - finllm
+
+networks:
+  finllm:
+    driver: bridge
+
+volumes:
+  pg_data:
+  caddy_data:
+  caddy_config:
