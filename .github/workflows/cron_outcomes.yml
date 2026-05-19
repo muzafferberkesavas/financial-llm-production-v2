@@ -1,0 +1,43 @@
+name: Cron — Outcome update + Platt retrain
+
+# Her gün 18:00 UTC (EOD post-market US) — open sinyalleri kontrol et,
+# closed olanları işaretle, Platt model retrain et (eğer ≥30 closed varsa).
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  update-outcomes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install duckdb-engine "psycopg[binary]" defusedxml
+
+      - name: Update outcomes + retrain Platt
+        working-directory: ./backend
+        run: python scripts/update_outcomes.py
+
+      - name: Upload calibration artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration-${{ github.run_id }}
+          path: |
+            backend/data/calibration/platt_model.json
+            backend/data/outcomes.jsonl
+          retention-days: 90
+          if-no-files-found: ignore

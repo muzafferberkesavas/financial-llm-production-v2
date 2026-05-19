@@ -8,14 +8,16 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Data & models
-backend/data/raw/
-backend/data/processed/
-backend/data/cache/
+backend/data/
 backend/models_cache/
 *.parquet
 *.duckdb
 *.sqlite
 *.db
+*.jsonl
+
+# Eski Flutter app referans dökümü
+lib_extracted/
 
 # Secrets
 .env

@@ -1,0 +1,65 @@
+name: Cron BIST pipeline
+
+# BIST pre-market: 09:30 TR = 06:30 UTC (winter) / 06:30 UTC (TR no DST since 2016)
+on:
+  schedule:
+    # Hafta içi 06:30 UTC
+    - cron: "30 6 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      llm_backend:
+        default: 'claude'
+        type: choice
+        options:
+          - claude
+          - mock
+
+jobs:
+  run-bist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHANNEL_BIST: ${{ secrets.TELEGRAM_CHANNEL_BIST }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install duckdb-engine "psycopg[binary]" alembic defusedxml aiogram
+
+      - name: Run pipeline (BIST)
+        working-directory: ./backend
+        run: |
+          python scripts/run_funnel.py \
+            --market bist \
+            --llm ${{ github.event.inputs.llm_backend || 'claude' }} \
+            --mode pre_market \
+            --capital 50000 \
+            --quota 10
+
+      - name: Upload signals JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signals-bist-${{ github.run_id }}
+          path: backend/data/out/signals_bist_*.json
+          retention-days: 30
+
+      - name: Notify Telegram on failure
+        if: failure() && env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHANNEL_BIST}" \
+            -d "text=⚠️ BIST cron pipeline FAILED. Logs: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

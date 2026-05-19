@@ -1,0 +1,72 @@
+name: Cron NASDAQ pipeline
+
+# Pre-market: 04:00 ET = 09:00 UTC (winter) / 08:00 UTC (summer DST)
+# GitHub Actions UTC kullanır — winter time için 09:00, DST için 08:00.
+# İki kez tetikleyip ilk dakikada görmeyi tercih edebiliriz; veya UTC sabit 09:00 yap.
+on:
+  schedule:
+    # Hafta içi (Mon-Fri) 09:00 UTC
+    - cron: "0 9 * * 1-5"
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      llm_backend:
+        description: 'LLM backend (mock/claude)'
+        default: 'claude'
+        type: choice
+        options:
+          - claude
+          - mock
+          - claude-deep-only
+
+jobs:
+  run-nasdaq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHANNEL_NASDAQ: ${{ secrets.TELEGRAM_CHANNEL_NASDAQ }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LOG_LEVEL: INFO
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install duckdb-engine "psycopg[binary]" alembic defusedxml aiogram
+
+      - name: Run pipeline (NASDAQ)
+        working-directory: ./backend
+        run: |
+          python scripts/run_funnel.py \
+            --market nasdaq \
+            --llm ${{ github.event.inputs.llm_backend || 'claude' }} \
+            --mode pre_market \
+            --capital 10000 \
+            --quota 12
+
+      - name: Upload signals JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signals-nasdaq-${{ github.run_id }}
+          path: backend/data/out/signals_nasdaq_*.json
+          retention-days: 30
+
+      - name: Notify Telegram on failure
+        if: failure() && env.TELEGRAM_BOT_TOKEN != ''
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHANNEL_NASDAQ}" \
+            -d "text=⚠️ NASDAQ cron pipeline FAILED (run_id: ${GITHUB_RUN_ID}). Logs: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
