@@ -74,6 +74,10 @@ services:
     image: caddy:2-alpine
     container_name: finllm-caddy
     restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DOMAIN: ${DOMAIN}
     ports:
       - "80:80"
       - "443:443"
