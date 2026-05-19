@@ -1,8 +1,17 @@
-# Render.com blueprint — FinLLM backend + telegram DM bot
-# Usage:
-#   1. Render.com'a GitHub repo'yu bağla
-#   2. New → Blueprint → bu dosyayı seç
-#   3. Env vars'ı doldur (Secret group: finllm-secrets)
+# Render.com blueprint — FinLLM backend
+# Postgres: Neon (https://console.neon.tech) — DATABASE_URL elle eklenir
+#
+# Kullanım:
+#   1. Neon'da yeni project: pooled connection string'i kopyala
+#   2. Render → New → Blueprint → bu repo'yu seç
+#   3. Render UI'da Environment Group "finllm-secrets" oluştur ve
+#      şu env vars'ı doldur:
+#        - DATABASE_URL  (Neon pooled connection)
+#        - ANTHROPIC_API_KEY
+#        - FINNHUB_API_KEY      (opsiyonel)
+#        - TELEGRAM_BOT_TOKEN   (opsiyonel)
+#        - TELEGRAM_CHANNEL_NASDAQ
+#        - TELEGRAM_CHANNEL_BIST
 #   4. Deploy
 
 services:
@@ -10,17 +19,16 @@ services:
   - type: web
     name: finllm-api
     runtime: docker
-    repo: # github.com/muzafferberkesavas/Financial-LLM-Production (kendi repo URL'in)
     branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     region: frankfurt
-    plan: starter  # $7/ay, 512MB RAM — başlangıç için yeterli
+    plan: starter  # $7/ay web service, 512MB RAM
     envVars:
       - key: MODE
         value: api
       - key: ANTHROPIC_API_KEY
-        sync: false  # Render UI'dan ekle
+        sync: false
       - key: FINNHUB_API_KEY
         sync: false
       - key: TELEGRAM_BOT_TOKEN
@@ -30,11 +38,9 @@ services:
       - key: TELEGRAM_CHANNEL_BIST
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: finllm-postgres
-          property: connectionString
+        sync: false  # Neon pooled connection — Render UI'dan ekle
       - key: API_BEARER_TOKEN
-        generateValue: true  # auto-generate
+        generateValue: true
       - key: PUBLIC_READ
         value: "true"
       - key: ENV
@@ -45,7 +51,6 @@ services:
   - type: worker
     name: finllm-telegram-dm
     runtime: docker
-    repo: # yukarıdakiyle aynı
     branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -59,24 +64,21 @@ services:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: finllm-postgres
-          property: connectionString
+        sync: false
       - key: ENV
         value: production
     dockerCommand: python /app/scripts/telegram_dm_bot.py
 
-  # ---- Cron worker (daily pipeline runs) ----
+  # ---- Cron: NASDAQ pre-market ----
   - type: cron
     name: finllm-cron-nasdaq
     runtime: docker
-    repo: # yukarıdakiyle aynı
     branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     region: frankfurt
     plan: starter
-    # 04:00 ET ≈ 09:00 UTC, NYSE pre-market
+    # 04:00 ET ≈ 09:00 UTC, NYSE pre-market (hafta içi)
     schedule: "0 9 * * 1-5"
     envVars:
       - key: ANTHROPIC_API_KEY
@@ -88,21 +90,19 @@ services:
       - key: TELEGRAM_CHANNEL_NASDAQ
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: finllm-postgres
-          property: connectionString
+        sync: false
     dockerCommand: python /app/scripts/run_funnel.py --market nasdaq --llm claude --mode pre_market
 
+  # ---- Cron: BIST pre-market ----
   - type: cron
     name: finllm-cron-bist
     runtime: docker
-    repo: # yukarıdakiyle aynı
     branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     region: frankfurt
     plan: starter
-    # 09:30 TR ≈ 06:30 UTC, BIST pre-market
+    # 09:30 TR ≈ 06:30 UTC, BIST pre-market (hafta içi)
     schedule: "30 6 * * 1-5"
     envVars:
       - key: ANTHROPIC_API_KEY
@@ -112,37 +112,20 @@ services:
       - key: TELEGRAM_CHANNEL_BIST
         sync: false
       - key: DATABASE_URL
-        fromDatabase:
-          name: finllm-postgres
-          property: connectionString
+        sync: false
     dockerCommand: python /app/scripts/run_funnel.py --market bist --llm claude --mode pre_market
 
+  # ---- Cron: günlük outcome update + Platt retrain ----
   - type: cron
     name: finllm-cron-outcomes
     runtime: docker
-    repo: # yukarıdakiyle aynı
     branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     region: frankfurt
     plan: starter
-    # Her gün 18:00 UTC — outcome update + Platt retrain
     schedule: "0 18 * * *"
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: finllm-postgres
-          property: connectionString
+        sync: false
     dockerCommand: python /app/scripts/update_outcomes.py
-
-# ---- Neon Postgres (Render'ın yerine kullanabilirsin) ----
-# Render'ın kendi managed Postgres'i:
-databases:
-  - name: finllm-postgres
-    plan: starter  # $7/ay, 256MB RAM, 1GB storage
-    region: frankfurt
-    postgresMajorVersion: 16
-
-# Alternatif: Neon (managed, generous free tier):
-#   DATABASE_URL=postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/finllm
-#   Yukarıdaki render.yaml database section'ı sil
