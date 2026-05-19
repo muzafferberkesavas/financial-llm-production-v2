@@ -48,13 +48,21 @@ def fetch_prices(
 
     if use_cache and cache_file.exists():
         cached = pd.read_parquet(cache_file)
+        first_date = cached.index.min().strftime("%Y-%m-%d")
         last_date = cached.index.max().strftime("%Y-%m-%d")
-        if last_date >= end:
+        needs_backfill = start < first_date
+        needs_forward = last_date < end
+        if not needs_backfill and not needs_forward:
             return cached.loc[start:end]
-        # Append yeni veri
-        logger.info(f"{symbol}: cache stale, appending {last_date} → {end}")
-        fresh = _download(symbol, last_date, end, interval)
-        merged = pd.concat([cached, fresh])
+
+        pieces = [cached]
+        if needs_backfill:
+            logger.info(f"{symbol}: cache backfill {start} → {first_date}")
+            pieces.insert(0, _download(symbol, start, first_date, interval))
+        if needs_forward:
+            logger.info(f"{symbol}: cache forward {last_date} → {end}")
+            pieces.append(_download(symbol, last_date, end, interval))
+        merged = pd.concat(pieces)
         merged = merged[~merged.index.duplicated(keep="last")].sort_index()
         merged.to_parquet(cache_file)
         return merged.loc[start:end]

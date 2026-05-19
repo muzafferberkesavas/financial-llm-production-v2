@@ -27,8 +27,14 @@ class Settings(BaseSettings):
     newsapi_key: str | None = Field(default=None, alias="NEWSAPI_KEY")
     polygon_api_key: str | None = Field(default=None, alias="POLYGON_API_KEY")
 
+    # Telegram (Phase 2.3)
+    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
+    telegram_channel_nasdaq: str | None = Field(default=None, alias="TELEGRAM_CHANNEL_NASDAQ")
+    telegram_channel_bist: str | None = Field(default=None, alias="TELEGRAM_CHANNEL_BIST")
+    telegram_admin_ids: str | None = Field(default=None, alias="TELEGRAM_ADMIN_IDS")
+
     database_url: str = Field(
-        default=f"duckdb:///{DATA_DIR / 'finllm.duckdb'}",
+        default=f"duckdb:///{(DATA_DIR / 'finllm.duckdb').resolve()}",
         alias="DATABASE_URL",
     )
 
