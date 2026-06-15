@@ -129,6 +129,12 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 - [x] **B.2** `portfolio/sector_gate.py`: weight/filter/veto/off modları. Sektör verisi evrenden (Ticker.sector). 16/16 test.
 - [x] **B.3** Backtest entegrasyonu (`strategy_engine` macro_provider, aylık-cache) + `scripts/measure_macro_lift.py` lift ölçümü.
 
+> **🟢🟢 ADİL TEST (broad çok-sektörlü evren, 2026-06-16):** Makro→sektör overlay'in değeri tech-ağırlıklı
+> nasdaq'ta gizliydi. ~60-isimli 11-sektörlü `BROAD_UNIVERSE`'te **filter +0.25 Sharpe (1.17→1.42), PF 1.47→1.66,
+> getiri +50.5%→+65.9%** daha az işlemle ($0.02, macro cache reuse). nasdaq'ta +0.02'ydi. **STRATEJİK: production
+> evrenini çok-sektörlü genişlet.** Ama **fundamental RE-RANKING ZARAR veriyor** (broad'da -0.27 Sharpe, monoton) —
+> teknik momentum edge'ini bozuyor; fundamentals **risk filtresi/debate girdisi** olmalı, ranking ağırlığı değil.
+>
 > **🟢 Faz B lift bulgusu (nasdaq 2022-24, gerçek Sonnet, $0.41):** **veto modu kazandırıyor** —
 > +48.3% vs off +43.4%, Sharpe 0.89 vs 0.82 (+0.07), PF 1.42 vs 1.37, daha az işlem (244 vs 251),
 > aynı DD. weight ~etkisiz, filter +0.02. **Uyarılar:** lift tek risk_off ayından (küçük örneklem),
