@@ -112,21 +112,12 @@ def fetch_pit_fundamentals(ticker: Ticker, symbol: str, as_of: str) -> Fundament
     if prior.get("net_income") and cur.get("net_income") and prior["net_income"] > 0:
         ni_growth = cur["net_income"] / prior["net_income"] - 1
 
-    pe = pb = None
-    try:
-        px = fetch_prices(symbol, start="2015-01-01", end=as_of, use_cache=True)
-        price = float(px["close"].iloc[-1]) if not px.empty else None
-    except Exception:  # noqa: BLE001
-        price = None
-    if price and cur.get("eps") and cur["eps"] > 0:
-        pe = price / cur["eps"]
-    if price and cur.get("equity") and cur.get("shares"):
-        book_ps = cur["equity"] / cur["shares"]
-        if book_ps > 0:
-            pb = price / book_ps
-
+    # Valuation (P/E, P/B) intentionally OMITTED: split-adjusted prices vs
+    # as-reported EPS/shares corrupt historical multiples. The PIT snapshot carries
+    # only the reliable price-independent signals (quality, growth, leverage), so
+    # the backtest measures a clean quality+growth+leverage ranking.
     return FundamentalSnapshot(
-        ticker=ticker, pe_ratio=pe, pb_ratio=pb, roe=roe, profit_margin=margin,
+        ticker=ticker, pe_ratio=None, pb_ratio=None, roe=roe, profit_margin=margin,
         revenue_growth_yoy=rev_growth, earnings_growth_yoy=ni_growth,
         debt_to_equity=de, current_ratio=current_ratio, free_cash_flow=fcf,
         sector=ticker.sector,
