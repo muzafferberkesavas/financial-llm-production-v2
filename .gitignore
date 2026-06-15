@@ -39,3 +39,4 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+backend/data/macro_cache.json
