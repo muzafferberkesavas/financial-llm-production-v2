@@ -104,12 +104,18 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 - [x] Survivorship: delisted semboller (ör. ARM) graceful skip + loglanıyor
 - **Çıktı:** Verifier-gated kapı canlı — hiçbir LLM sinyali bu gate geçmeden production'a gitmez.
 
-> **🔴 Faz A bulgusu (kritik):** Gerçekçi maliyet + next-bar dolum + walk-forward ile strateji
-> **rejim-bağımlı** çıktı ve gate'ten **KALDI**. nasdaq 2022–24, midas-us: BOĞA ort. PF 1.28 vs
-> **AYI ort. PF 0.36**; pencerelerin sadece %56'sı PF>1. Sıfır-maliyet baseline (PF 1.22) gerçekçi
-> maliyetle PF 1.09'a, walk-forward'da rejime göre 0.27–1.81 aralığına düşüyor. **Sonuç:** mevcut
-> setup bir *boğa-piyasası* stratejisi; turnover (yüksek işlem) maliyet edge'ini eritiyor. Önce
-> strateji robustluğu (turnover ↓, regime gate redesign, exit mantığı) düzeltilmeli — sonra LLM lift.
+> **🔴 Faz A bulgusu:** Gerçekçi maliyet + next-bar dolum + walk-forward ile strateji önce
+> **rejim-bağımlı** çıktı ve gate'ten KALDI (BOĞA PF 1.28 vs AYI 0.36; %56 pencere PF>1).
+>
+> **🟢 Faz A.4 çözümü (2026-06-15) — gate GEÇTİ:** Kök sebep, QQQ regime gate'in (EMA21/50 +
+> 20-bar eğim) 2022 bear rally'lerinde yeniden tetiklenmesiydi. Çözüm klasik **200-günlük ortalama
+> (SMA200) bull/bear filtresi**: giriş için `close > SMA200` da gerekli (`qqq_uptrend(long_sma_period=200)`,
+> `--regime-long-period`). Sonuç (nasdaq 2022–24, midas-us, walk-forward): **median PF 1.49, %89 pencere
+> PF>1, worst DD −11.6%, AYI +4.2%.** Periyoda (200 ve 250 geçer, 150 kısa) ve setup-eşiğine (0.4/0.5)
+> duyarsız → curve-fit değil. 2022-01 penceresi: 35 işlem/−16.4% → 7 işlem/−3.1% (doğru şekilde dışarıda).
+> Gate mantığı da düzeltildi: sermaye korumasını ödüllendiriyor (bear getiri-bazlı ≥−5%, median işlem).
+> **Uyarı:** bear-robustluk tek tarihsel bear'a (2022) dayanıyor; cache 2008/2018/2020'ye ulaşmıyor,
+> out-of-sample güven orta. **Takip:** canlı `pipeline/regime.py` de SMA200 kuralını benimsemeli.
 
 ### Faz B — Top-down makro→sektör katmanı `[A5]`
 - [ ] `pipeline/stage_macro.py`: policy docs + makro veri + sentiment → sektör iştahı (LLM)
