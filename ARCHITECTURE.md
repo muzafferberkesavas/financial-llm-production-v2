@@ -153,9 +153,10 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 - [x] Ölçüldü: aynı hüküm, **−%41 maliyet** ($0.035→$0.020/hisse); panel default tiered
 - [ ] (opsiyonel) Opus judge yüksek-konviksiyon isimler için escalation
 
-### Faz E — BIST & Altın genişlemesi
-- [ ] Türkçe haber/sentiment modeli + veri sağlayıcı
-- [ ] Makro→sektör deseninin ince, perakende-ağırlıklı BIST'e transferini test et
+### Faz E — BIST & Altın genişlemesi 🟡 **BAŞLADI (2026-06-16)**
+- [x] Engine market-aware (`market` param, BIST thresholds + XU100.IS regime). Teknik çekirdek BIST'te çalışıyor (PF 1.42, Sharpe 1.02; uyarı: TRY enflasyon → nominal şişik)
+- [ ] Türkçe haber/sentiment modeli + BIST sektör haritası + BIST fundamentals
+- [ ] Altın: commodity path (makro Precious Metals iştahı zaten var; fundamentals yok)
 
 ---
 
