@@ -148,10 +148,10 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 - [ ] Bull vs Bear safe-debate (referansa demir atma zorunlu)
 - [ ] Trader sentezi + 3-yönlü risk ekibi → exposure limit
 
-### Faz D — Model katmanlama & maliyet `[A8]`
-- [ ] Ucuz analistler (Haiku) + güçlü final sentez (Opus)
-- [ ] 3 piyasa × 5-7 ajan per-hisse maliyet/gecikme ölçümü (açık soru)
-- [ ] Not: Opus temperature deprecated — literal değil, *katmanlama fikrini* uygula
+### Faz D — Model katmanlama & maliyet ✅ **TAMAMLANDI (2026-06-16)** `[A8]`
+- [x] Ucuz analist (Haiku adversary) + güçlü hakem (Sonnet judge) — `llm/debate.py` tiered
+- [x] Ölçüldü: aynı hüküm, **−%41 maliyet** ($0.035→$0.020/hisse); panel default tiered
+- [ ] (opsiyonel) Opus judge yüksek-konviksiyon isimler için escalation
 
 ### Faz E — BIST & Altın genişlemesi
 - [ ] Türkçe haber/sentiment modeli + veri sağlayıcı
