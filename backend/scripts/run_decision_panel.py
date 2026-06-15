@@ -47,6 +47,8 @@ def main() -> None:
     ap.add_argument("--top-n", type=int, default=4)
     ap.add_argument("--no-debate", action="store_true")
     ap.add_argument("--no-macro", action="store_true")
+    ap.add_argument("--export", action="store_true",
+                    help="write the panel as signals_<market>.json for the dashboard API")
     args = ap.parse_args()
 
     symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
@@ -123,6 +125,18 @@ def main() -> None:
     if not args.no_debate:
         console.print(f"\n[bold]Total LLM cost:[/bold] [green]${result.total_cost_usd:.4f}[/green] "
                       f"({len(result.actionable())} actionable AL/GUCLU_AL)")
+
+    # 7) export for the dashboard API (DATA_DIR/out/signals_nasdaq_*.json)
+    if args.export:
+        from finllm.api.panel_serialize import panel_to_response, write_signals_file
+        from finllm.portfolio.construction import construct_portfolio
+        port = construct_portfolio(result.decisions) if result.actionable() else None
+        payload = panel_to_response(
+            result, port, market="nasdaq",
+            macro_stance=(macro.overall_stance if macro else ""),
+        )
+        path = write_signals_file(payload, "nasdaq")
+        console.print(f"[green]Exported[/green] {len(payload['signals'])} signals → {path}")
 
 
 if __name__ == "__main__":
