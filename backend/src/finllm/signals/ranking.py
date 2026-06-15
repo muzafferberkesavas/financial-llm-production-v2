@@ -79,4 +79,57 @@ def rank_candidates(candidates: list[CandidateScore]) -> list[CandidateScore]:
     return sorted(candidates, key=lambda c: c.priority, reverse=True)
 
 
-__all__ = ["CandidateScore", "score_candidate", "rank_candidates", "W_RISK_REWARD", "W_TECHNICAL"]
+def _fmt(v, pct=False, suffix=""):
+    if v is None:
+        return "n/a"
+    return f"{v*100:.1f}%" if pct else f"{v:.2f}{suffix}"
+
+
+def build_debate_block(
+    symbol: str,
+    setup_score: float,
+    snap: FundamentalSnapshot | None = None,
+    *,
+    finnhub: FinnhubSignals | None = None,
+    sector_appetite: float = 0.5,
+    rr: RiskRewardScore | None = None,
+) -> str:
+    """Assemble the per-stock DATA BLOCK fed to the Faz C debate — all signals in
+    one text view so bull/bear arguments can anchor to specific figures."""
+    rr = rr or score_risk_reward(snap, None, sector_appetite, finnhub)
+    lines = [f"[{symbol}] medium-term long candidate", ""]
+    lines.append(f"[TECHNICAL] setup score {setup_score:.2f} (0-1; entry-timing quality)")
+
+    if snap is not None:
+        lines += [
+            "[FUNDAMENTALS]",
+            f"  sector {snap.sector or 'n/a'} | P/E {_fmt(snap.pe_ratio)} (fwd {_fmt(snap.forward_pe)}) | "
+            f"PEG {_fmt(snap.peg_ratio)} | P/B {_fmt(snap.pb_ratio)}",
+            f"  ROE {_fmt(snap.roe, pct=True)} | profit margin {_fmt(snap.profit_margin, pct=True)} | "
+            f"rev growth {_fmt(snap.revenue_growth_yoy, pct=True)} | earnings growth {_fmt(snap.earnings_growth_yoy, pct=True)}",
+            f"  D/E {_fmt(snap.debt_to_equity)} | current ratio {_fmt(snap.current_ratio)} | "
+            f"FCF {'positive' if (snap.free_cash_flow or 0) > 0 else 'NEGATIVE' if snap.free_cash_flow is not None else 'n/a'}",
+        ]
+    else:
+        lines.append("[FUNDAMENTALS] n/a")
+
+    if finnhub is not None:
+        lines.append(
+            f"[EARNINGS/ANALYST] earnings {finnhub.earnings_momentum} "
+            f"(streak {finnhub.beat_streak}Q, avg surprise {_fmt(finnhub.avg_surprise_pct, suffix='%')}) | "
+            f"analyst {finnhub.analyst_label} ({_fmt(finnhub.analyst_score)}, n={finnhub.n_analysts})"
+        )
+
+    lines.append(f"[MACRO] sector appetite {sector_appetite:.2f} (0.5 neutral; >0.5 tailwind)")
+    lines.append(
+        f"[RISK/REWARD] reward {rr.reward:.0f} | risk {rr.risk:.0f} | quality {rr.quality_flag} | "
+        f"composite {rr.composite:.0f}/100"
+        + (f" | drivers: {'; '.join(rr.notes)}" if rr.notes else "")
+    )
+    return "\n".join(lines)
+
+
+__all__ = [
+    "CandidateScore", "score_candidate", "rank_candidates",
+    "build_debate_block", "W_RISK_REWARD", "W_TECHNICAL",
+]
