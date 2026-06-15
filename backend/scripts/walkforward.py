@@ -16,11 +16,15 @@ from loguru import logger
 from rich.console import Console
 from rich.table import Table
 
+from rich.panel import Panel
+
 from finllm.backtest.costs import PRESETS
 from finllm.backtest.universe import resolve
-from finllm.backtest.walkforward import run_walk_forward, summarize
+from finllm.backtest.walkforward import evaluate_gate, run_walk_forward, summarize
 
 console = Console()
+
+_REGIME_STYLE = {"BULL": "green", "BEAR": "red", "SIDEWAYS": "yellow"}
 
 
 def parse_date(s: str) -> datetime:
@@ -38,23 +42,47 @@ def render(results, summary) -> None:
     t.add_column("Syms", justify="right")
     t.add_column("Return", justify="right")
     t.add_column("Sharpe", justify="right")
+    t.add_column("Regime")
     t.add_column("PF", justify="right")
     t.add_column("MaxDD", justify="right")
     t.add_column("Trades", justify="right")
     for i, r in enumerate(results, 1):
         m = r.metrics
         pf_style = "green" if m.profit_factor > 1.0 else "red"
+        reg_style = _REGIME_STYLE.get(r.regime, "white")
         t.add_row(
             str(i),
             f"{r.start.date()} → {r.end.date()}",
             str(r.n_symbols),
             f"{m.total_return_pct:+.1f}%",
             f"{m.sharpe:.2f}",
+            f"[{reg_style}]{r.regime}[/{reg_style}]",
             f"[{pf_style}]{_pf(m.profit_factor)}[/{pf_style}]",
             f"{m.max_drawdown_pct:.1f}%",
             str(m.n_trades),
         )
     console.print(t)
+
+    # Per-regime breakdown — does the edge survive a bear?
+    by_regime = summary.get("by_regime", {})
+    if by_regime:
+        reg_t = Table(title="By market regime", show_header=True, header_style="bold cyan")
+        reg_t.add_column("Regime")
+        reg_t.add_column("Windows", justify="right")
+        reg_t.add_column("Mean PF", justify="right")
+        reg_t.add_column("Mean return", justify="right")
+        for regime in ("BULL", "SIDEWAYS", "BEAR"):
+            d = by_regime.get(regime)
+            if not d:
+                continue
+            reg_style = _REGIME_STYLE.get(regime, "white")
+            reg_t.add_row(
+                f"[{reg_style}]{regime}[/{reg_style}]",
+                str(d["n"]),
+                f"{d['profit_factor']['mean']:.2f}",
+                f"{d['return_pct']['mean']:+.1f}%",
+            )
+        console.print(reg_t)
 
     s = summary
     summ = Table(title="Distribution across windows", show_header=True, header_style="bold magenta")
@@ -78,6 +106,25 @@ def render(results, summary) -> None:
     cons.add_row("Sharpe > 0", f"{s['pct_sharpe_gt_0']*100:.0f}%")
     cons.add_row("Positive return", f"{s['pct_positive_return']*100:.0f}%")
     console.print(cons)
+
+
+def render_gate(report) -> None:
+    gate_t = Table(show_header=True, header_style="bold")
+    gate_t.add_column("Criterion")
+    gate_t.add_column("Result")
+    gate_t.add_column("", justify="center")
+    for c in report.checks:
+        mark = "[green]PASS[/green]" if c.passed else "[red]FAIL[/red]"
+        gate_t.add_row(c.name, c.detail, mark)
+    verdict = "[bold green]✓ ROBUSTNESS GATE PASSED[/bold green]" if report.passed \
+        else "[bold red]✗ ROBUSTNESS GATE FAILED[/bold red]"
+    border = "green" if report.passed else "red"
+    console.print(Panel(gate_t, title=verdict, border_style=border))
+    if not report.passed:
+        console.print(
+            "[dim]Strategy is NOT production-ready: do not trust live/LLM signals "
+            "on top of it until the gate passes (ARCHITECTURE.md §1 K4).[/dim]"
+        )
 
 
 def main() -> None:
@@ -111,8 +158,12 @@ def main() -> None:
         raise SystemExit("no windows produced results")
 
     summary = summarize(results)
+    gate = evaluate_gate(results, summary)
     console.print()
     render(results, summary)
+    console.print()
+    render_gate(gate)
+    raise SystemExit(0 if gate.passed else 1)
 
 
 if __name__ == "__main__":
