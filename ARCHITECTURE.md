@@ -95,13 +95,21 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 
 ## 4. Yol Haritası (faz faz)
 
-### Faz A — Backtest gate sertleştirme *(önce bu — en yüksek kaldıraç)* `[A6][A7]`
-- [ ] Çoklu pencere (walk-forward) testi
-- [ ] Gerçekçi işlem maliyeti + slippage modeli
-- [ ] Look-ahead & survivorship-bias denetimi
-- [ ] Rejim stres testi (boğa/ayı/yatay)
-- [ ] Minimum evren genişliği + pencere uzunluğu standardı belirle
-- **Çıktı:** Hiçbir LLM sinyali bu gate'ten geçmeden production'a gitmez.
+### Faz A — Backtest gate sertleştirme ✅ **TAMAMLANDI (2026-06-15)** `[A6][A7]`
+- [x] **A.1** Gerçekçi işlem maliyeti + slippage (`backtest/costs.py`, Midas tarifesi: US $1.5/işlem, BIST 0) — `--costs {midas-us,midas-bist,zero}`
+- [x] **A.1** Look-ahead düzeltmesi: girişler **next-bar-OPEN** dolduruluyor (close[t]'de karar, open[t+1]'de dolum)
+- [x] **A.2** Walk-forward testi (`backtest/walkforward.py`, `scripts/walkforward.py`) — çoklu kayan pencere, PF/Sharpe dağılımı + tutarlılık oranları
+- [x] **A.3** Rejim etiketleme (BULL/BEAR/SIDEWAYS) + per-regime kırılım
+- [x] **A.3** Robustness gate standardı (`RobustnessStandard`/`evaluate_gate`): median PF≥1.2, ≥%70 pencere PF>1, worst DD≥−30%, ≥20 işlem/pencere, bear PF≥0.9
+- [x] Survivorship: delisted semboller (ör. ARM) graceful skip + loglanıyor
+- **Çıktı:** Verifier-gated kapı canlı — hiçbir LLM sinyali bu gate geçmeden production'a gitmez.
+
+> **🔴 Faz A bulgusu (kritik):** Gerçekçi maliyet + next-bar dolum + walk-forward ile strateji
+> **rejim-bağımlı** çıktı ve gate'ten **KALDI**. nasdaq 2022–24, midas-us: BOĞA ort. PF 1.28 vs
+> **AYI ort. PF 0.36**; pencerelerin sadece %56'sı PF>1. Sıfır-maliyet baseline (PF 1.22) gerçekçi
+> maliyetle PF 1.09'a, walk-forward'da rejime göre 0.27–1.81 aralığına düşüyor. **Sonuç:** mevcut
+> setup bir *boğa-piyasası* stratejisi; turnover (yüksek işlem) maliyet edge'ini eritiyor. Önce
+> strateji robustluğu (turnover ↓, regime gate redesign, exit mantığı) düzeltilmeli — sonra LLM lift.
 
 ### Faz B — Top-down makro→sektör katmanı `[A5]`
 - [ ] `pipeline/stage_macro.py`: policy docs + makro veri + sentiment → sektör iştahı (LLM)
