@@ -61,6 +61,8 @@ class StrategyBacktestEngine(BacktestEngine):
         regime_long_period: int | None = 200,
         sector_gate: SectorGateConfig | None = None,
         macro_provider: MacroProvider | None = None,
+        fundamental_provider: Callable[[str, str], "float | None"] | None = None,
+        fundamental_weight: float = 0.0,
     ):
         super().__init__(config)
         self.min_setup_score = min_setup_score
@@ -69,6 +71,12 @@ class StrategyBacktestEngine(BacktestEngine):
         self.thresholds = get_adapter("nasdaq").thresholds
         self.regime_prices: pd.DataFrame | None = None
         self._regime_cache: dict[pd.Timestamp, bool] = {}
+
+        # Fundamental ranking overlay (Faz B.3 / full-stack backtest): re-rank the
+        # candidates competing for the limited slots by a blend of technical setup
+        # and the point-in-time fundamental composite. weight 0 = setup-only baseline.
+        self.fundamental_provider = fundamental_provider
+        self.fundamental_weight = max(0.0, min(1.0, fundamental_weight))
 
         # Macro→sector gate (Faz B.3). Active only when both a config and a
         # provider are supplied; macro views are cached per calendar month so a
@@ -162,9 +170,22 @@ class StrategyBacktestEngine(BacktestEngine):
         if open_slots <= 0 or not signals:
             return []
 
-        # Rank new candidates by setup score (technical factor), best first.
+        # Rank new candidates for the limited slots. Baseline = setup score; with a
+        # fundamental overlay, blend in the point-in-time fundamental composite.
         fresh = [s for s in signals if s.symbol not in held]
-        fresh.sort(key=lambda s: s.signals.technical.score, reverse=True)
+        if self.fundamental_weight > 0 and self.fundamental_provider is not None:
+            as_of = date.strftime("%Y-%m-%d")
+            fw = self.fundamental_weight
+
+            def _combined(s) -> float:
+                setup = s.signals.technical.score
+                comp = self.fundamental_provider(s.symbol, as_of)
+                comp_norm = (comp / 100.0) if comp is not None else 0.5
+                return (1.0 - fw) * setup + fw * comp_norm
+
+            fresh.sort(key=_combined, reverse=True)
+        else:
+            fresh.sort(key=lambda s: s.signals.technical.score, reverse=True)
         fresh = fresh[:open_slots]
         if not fresh:
             return []
