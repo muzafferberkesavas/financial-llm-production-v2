@@ -76,13 +76,17 @@ def make_cached_llm_macro_provider(cache_path: str | Path, model: str | None = N
         if inner is None:
             inner = make_llm_macro_provider(model)
         analysis = inner(as_of)
-        if analysis is not None:
+        # Only cache REAL results — never an API-error fallback (empty sectors),
+        # so a later run with credit redoes the month instead of reusing garbage.
+        if analysis is not None and analysis.sectors:
             cache[month] = _to_dict(analysis)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(cache, indent=2))
             stats["live_calls"] += 1
             stats["cost_usd"] += analysis.cost_usd
             logger.info(f"[MACRO-CACHE] {month} live call (${analysis.cost_usd:.4f})")
+        else:
+            stats["failed_calls"] = stats.get("failed_calls", 0) + 1
         return analysis
 
     return provider, stats
