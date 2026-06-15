@@ -120,10 +120,19 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 > worst DD −16.4%, median PF 1.24. **Sonuç: 200-DMA fix 2022'ye overfit DEĞİL — 2018/2020 bear'larına da
 > genelliyor.** Bear-robustluk artık iki bağımsız dönemde (2018-Q4, COVID) kanıtlı.
 
-### Faz B — Top-down makro→sektör katmanı `[A5]`
-- [ ] `pipeline/stage_macro.py`: policy docs + makro veri + sentiment → sektör iştahı (LLM)
-- [ ] Sektör çıktısı hisse sinyalini nasıl kapılayacak? → **filtre / güven-ağırlık / veto** (karar verilecek, açık soru)
-- [ ] BIST + Altın + US makro veri sağlayıcıları (açık soru — FRED, TCMB, vb.)
+### Faz B — Top-down makro→sektör katmanı ✅ **ÇEKİRDEK TAMAM (2026-06-15)** `[A5]`
+- [x] **B.1** `data/macro.py` + `data/fred.py`: FRED (CPI/PCE/Fed/NFP/eğri, point-in-time) + yfinance (VIX/endeks-200DMA/altın/petrol) + RSS haber → MACRO CONTEXT. Hepsi ücretsiz.
+- [x] **B.1** `llm/macro_sector.py` (Sonnet 4.6) + `skills/macro-sector-analyst`: makro context → risk stance + 12 sektör iştahı (0-1). Haberlerle keskin (Tech 0.78/Energy 0.30, Iran-deal muhakemesi), veri zayıfsa neutral.
+- [x] **B.2** `portfolio/sector_gate.py`: weight/filter/veto/off modları. Sektör verisi evrenden (Ticker.sector). 16/16 test.
+- [x] **B.3** Backtest entegrasyonu (`strategy_engine` macro_provider, aylık-cache) + `scripts/measure_macro_lift.py` lift ölçümü.
+
+> **🟢 Faz B lift bulgusu (nasdaq 2022-24, gerçek Sonnet, $0.41):** **veto modu kazandırıyor** —
+> +48.3% vs off +43.4%, Sharpe 0.89 vs 0.82 (+0.07), PF 1.42 vs 1.37, daha az işlem (244 vs 251),
+> aynı DD. weight ~etkisiz, filter +0.02. **Uyarılar:** lift tek risk_off ayından (küçük örneklem),
+> 200-DMA regime gate ile örtüşüyor, ve backtest CANLI değeri AZ gösteriyor (tarihsel haber yok →
+> 18/23 ay neutral). **Karar:** veto modu opsiyonel adopte; asıl değer canlı (haber-tahrikli rotasyon)
+> + geniş çok-sektörlü evren. **Sektör→hisse kapılama açık sorusu ÇÖZÜLDÜ: weight/filter/veto hepsi
+> implement + configurable; veto en iyi.**
 
 ### Faz C — Multi-agent debate `[A3][A9]`
 - [ ] Analist ajanlarını paralelleştir (fundamental/technical/sentiment/news)
