@@ -71,7 +71,8 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 | **K2** Analist ajanları | `pipeline/stage1_filter`, `stage1b_setup`, `stage1c_features`, `stage2_screen`, `stage3_deep` | 🟡 Var ama tek-akış (debate yok) |
 | **K2** Risk/getiri füzyonu | `indicators/risk_reward` (temel+finnhub+makro) + `signals/ranking` (birleşik öncelik) | ✅ **YENİ (2026-06-15)** — teknik+temel+earnings/analyst+makro → tek orta-vade öncelik skoru |
 | **K3** Bull/Bear debate | `llm/debate.py` (adversary + judge, Sonnet 4.6) + `skills/debate-*` | ✅ **YENİ (2026-06-15)** — 2-çağrı panel, top-N adaya, ~$0.035/hisse |
-| **K3** Trader sentezi + risk | `pipeline/stage4_judge`, `ensemble/multi_llm_voter` | 🟡 Judge var, çok-yönlü risk ekibi yok |
+| **K3** Trader sentezi + risk | `pipeline/stage4_judge`, `ensemble/multi_llm_voter`, `llm/debate` judge | ✅ Debate judge (aksiyon+güven+pozisyon boyutu+risk) |
+| **K3** Orchestration | `pipeline/decision_panel` (ranking→top-N debate→hüküm) | ✅ **YENİ (2026-06-16)** — uçtan uca çalışıyor, `scripts/run_decision_panel.py` |
 | **K4** Backtest gate | `pipeline/stage4_5_backtest_gate`, `backtest/engine`, `strategy_engine` | ✅ Var — **korunacak & sertleştirilecek** |
 | **K4** Pozisyon/kalibrasyon | `calibration/kelly`, `calibration/platt`, `calibration/tracker` | ✅ Var |
 | **K4** Writer/çıktı | `pipeline/stage5_writer` | ✅ Var |
