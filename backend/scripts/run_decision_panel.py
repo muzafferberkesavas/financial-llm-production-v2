@@ -103,6 +103,23 @@ def main() -> None:
         console.print(f"  [red]bear:[/red] " + " | ".join(p.claim for p in v.bear_points[:2]))
         console.print(f"  [dim]{v.rationale[:240]}…[/dim]")
 
+    # 6) construct the portfolio from actionable verdicts (free)
+    if not args.no_debate and result.actionable():
+        from finllm.portfolio.construction import construct_portfolio
+        port = construct_portfolio(result.decisions)
+        pt = Table(title="Constructed portfolio (risk-limited)", show_header=True, header_style="bold green")
+        for col in ("Symbol", "Sector", "Weight", "Action", "Conf"):
+            pt.add_column(col, justify="right" if col in ("Weight", "Conf") else "left")
+        for pos in port.positions:
+            pt.add_row(pos.symbol, pos.sector, f"{pos.weight_pct:.1f}%", pos.action, f"{pos.confidence:.2f}")
+        pt.add_row("[dim]CASH[/dim]", "", f"[dim]{port.cash_pct:.1f}%[/dim]", "", "")
+        console.print()
+        console.print(pt)
+        console.print(f"  invested {port.total_exposure_pct:.0f}% | sectors "
+                      + ", ".join(f"{k} {v:.0f}%" for k, v in port.sector_exposure.items()))
+        if port.notes:
+            console.print(f"  [dim]{'; '.join(port.notes)}[/dim]")
+
     if not args.no_debate:
         console.print(f"\n[bold]Total LLM cost:[/bold] [green]${result.total_cost_usd:.4f}[/green] "
                       f"({len(result.actionable())} actionable AL/GUCLU_AL)")
