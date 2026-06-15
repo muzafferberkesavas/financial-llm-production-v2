@@ -60,6 +60,10 @@ def render_console(result: BacktestResult, metrics: PerformanceMetrics) -> None:
     pf = "∞" if metrics.profit_factor == float("inf") else f"{metrics.profit_factor:.2f}"
     trades.add_row("Profit factor", pf)
     trades.add_row("Avg duration", f"{metrics.avg_trade_duration_days:.1f} days")
+    commission = result.ledger.total_commission_usd
+    if commission > 0:
+        drag_pct = commission / cfg.initial_capital * 100
+        trades.add_row("Total commission", f"${commission:,.2f} ({drag_pct:.2f}% of capital)")
     console.print(trades)
 
     # Exit reason breakdown
@@ -87,6 +91,8 @@ def save_run(result: BacktestResult, metrics: PerformanceMetrics, out_dir: Path)
         "start": result.config.start.isoformat(),
         "end": result.config.end.isoformat(),
         "initial_capital": result.config.initial_capital,
+        "costs": asdict(result.config.costs),
+        "total_commission_usd": round(result.ledger.total_commission_usd, 2),
     }
     (run_dir / "metrics.json").write_text(
         json.dumps({"config": config_dump, "metrics": metrics.to_dict()}, indent=2)

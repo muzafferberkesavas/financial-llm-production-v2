@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from loguru import logger
 
+from finllm.backtest.costs import CostModel
 from finllm.backtest.ledger import BacktestLedger
 from finllm.backtest.signals import DEFAULT_HOLDING_MAX, technical_signal
 from finllm.data.prices import fetch_prices
@@ -38,6 +39,7 @@ class BacktestConfig:
     start: datetime
     end: datetime
     initial_capital: float = 10_000.0
+    costs: CostModel = field(default_factory=CostModel.midas_us)
 
     def __post_init__(self) -> None:
         if self.end <= self.start:
@@ -56,7 +58,9 @@ class BacktestResult:
 class BacktestEngine:
     def __init__(self, config: BacktestConfig):
         self.config = config
-        self.ledger = BacktestLedger(initial_capital=config.initial_capital)
+        self.ledger = BacktestLedger(
+            initial_capital=config.initial_capital, costs=config.costs
+        )
         self.prices: dict[str, pd.DataFrame] = {}
         self.features: dict[str, pd.DataFrame] = {}
 
@@ -100,6 +104,15 @@ class BacktestEngine:
         if window.empty:
             return None
         return float(window["close"].iloc[-1])
+
+    def _today_open(self, sym: str, date: pd.Timestamp) -> float | None:
+        """Opening price on ``date`` — the realistic fill for an order decided at
+        the *previous* session's close (no same-bar look-ahead)."""
+        df = self.prices[sym]
+        if date not in df.index:
+            return None
+        val = df.loc[date, "open"]
+        return float(val) if pd.notna(val) else None
 
     def _today_bar(self, sym: str, date: pd.Timestamp) -> pd.Series | None:
         df = self.prices[sym]
@@ -149,22 +162,34 @@ class BacktestEngine:
                 signals.append(sig)
         return signals
 
-    def _open_new_positions(self, date: pd.Timestamp, signals: list) -> None:
+    def _plan_entries(self, date: pd.Timestamp, signals: list) -> list[tuple]:
+        """Decide WHICH symbols to buy and HOW MUCH, using info available at
+        ``date`` close. Returns ``[(signal, target_capital_usd), ...]``. The
+        actual fill is deferred to the next session's open (see ``run``)."""
         held = self.ledger.held_symbols()
         candidates = select_buy_candidates(signals, exclude_symbols=held)
         weighted = compute_weights(candidates)
         if not weighted:
-            return
-
+            return []
         today_prices = {sig.symbol: self._today_close(sig.symbol, date) for sig, _ in weighted}
         total_value = self.ledger.total_value({s: p for s, p in today_prices.items() if p is not None})
+        return [(signal, total_value * weight_pct / 100) for signal, weight_pct in weighted]
+
+    def _execute_entries(self, date: pd.Timestamp, plans: list[tuple]) -> None:
+        """Fill planned entries at TODAY's open (orders were decided yesterday)."""
+        if not plans:
+            return
+        held = self.ledger.held_symbols()
+        open_prices = {sig.symbol: self._today_open(sig.symbol, date) for sig, _ in plans}
+        total_value = self.ledger.total_value({s: p for s, p in open_prices.items() if p is not None})
         min_capital = total_value * MIN_NEW_POSITION_PCT / 100
 
-        for signal, weight_pct in weighted:
-            entry_price = today_prices.get(signal.symbol)
+        for signal, target_capital in plans:
+            if signal.symbol in held:
+                continue
+            entry_price = open_prices.get(signal.symbol)
             if entry_price is None or entry_price <= 0:
                 continue
-            target_capital = total_value * weight_pct / 100
             actual_capital = min(target_capital, self.ledger.cash)
             if actual_capital < min_capital:
                 continue
@@ -175,6 +200,7 @@ class BacktestEngine:
                 capital_usd=actual_capital,
                 max_holding_days=signal.holdingDays.max or DEFAULT_HOLDING_MAX,
             )
+            held.add(signal.symbol)
 
     def _record_snapshot(self, date: pd.Timestamp) -> None:
         prices = {s: self._today_close(s, date) for s in self.ledger.held_symbols()}
@@ -190,10 +216,16 @@ class BacktestEngine:
         days = self._trading_days()
         logger.info(f"Simulating {len(days)} trading days: {days[0].date()} → {days[-1].date()}")
 
+        # Entries are decided at close[t] but filled at open[t+1] (no same-bar
+        # look-ahead). `pending` carries yesterday's plan into today's open.
+        pending: list[tuple] = []
         for i, date in enumerate(days):
+            if pending:
+                self._execute_entries(date, pending)
+                pending = []
             self._check_exits(date)
             signals = self._generate_signals(date)
-            self._open_new_positions(date, signals)
+            pending = self._plan_entries(date, signals)
             self._record_snapshot(date)
             if (i + 1) % 50 == 0:
                 eq = self.ledger.equity_curve[-1].total

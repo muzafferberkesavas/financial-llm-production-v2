@@ -28,7 +28,6 @@ from finllm.backtest.engine import (
     BacktestEngine,
 )
 from finllm.backtest.strategy_signals import (
-    DEFAULT_HOLDING_MAX,
     qqq_uptrend,
     strategy_signal,
 )
@@ -37,7 +36,6 @@ from finllm.markets import get_adapter
 
 REGIME_SYMBOL = "QQQ"
 MAX_POSITIONS = 7
-MIN_NEW_POSITION_PCT = 2.0
 
 
 class StrategyBacktestEngine(BacktestEngine):
@@ -122,37 +120,28 @@ class StrategyBacktestEngine(BacktestEngine):
 
     # ---------- sizing (override: fixed fractional, no MIN_POSITIONS gate) ----------
 
-    def _open_new_positions(self, date: pd.Timestamp, signals: list) -> None:
+    def _plan_entries(self, date: pd.Timestamp, signals: list) -> list[tuple]:
+        """Equal-weight slug per qualifying setup, ranked by setup score.
+
+        Decided at close[t]; the base engine fills the plan at open[t+1] with
+        slippage + commission applied. Only the selection/sizing differs from the
+        generic engine — execution is shared.
+        """
         held = self.ledger.held_symbols()
         open_slots = MAX_POSITIONS - len(held)
         if open_slots <= 0 or not signals:
-            return
+            return []
 
         # Rank new candidates by setup score (technical factor), best first.
         fresh = [s for s in signals if s.symbol not in held]
         fresh.sort(key=lambda s: s.signals.technical.score, reverse=True)
         fresh = fresh[:open_slots]
         if not fresh:
-            return
+            return []
 
         prices_today = {s.symbol: self._today_close(s.symbol, date) for s in fresh}
         total_value = self.ledger.total_value(
             {s: p for s, p in prices_today.items() if p is not None}
         )
         target_capital = total_value / MAX_POSITIONS  # equal-weight slug
-        min_capital = total_value * MIN_NEW_POSITION_PCT / 100
-
-        for signal in fresh:
-            entry_price = prices_today.get(signal.symbol)
-            if entry_price is None or entry_price <= 0:
-                continue
-            actual_capital = min(target_capital, self.ledger.cash)
-            if actual_capital < min_capital:
-                continue
-            self.ledger.open_position(
-                signal=signal,
-                entry_price=entry_price,
-                entry_date=date.to_pydatetime(),
-                capital_usd=actual_capital,
-                max_holding_days=signal.holdingDays.max or DEFAULT_HOLDING_MAX,
-            )
+        return [(signal, target_capital) for signal in fresh]

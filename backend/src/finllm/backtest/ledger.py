@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
+from finllm.backtest.costs import CostModel
 from finllm.portfolio.models import ExitReason, Position
 from finllm.signals.schema import Signal
 
@@ -18,15 +19,16 @@ class ClosedTrade:
     symbol: str
     entry_date: datetime
     exit_date: datetime
-    entry_price: float
-    exit_price: float
+    entry_price: float          # actual fill price (slippage applied)
+    exit_price: float           # actual fill price (slippage applied)
     shares: float
-    capital_usd: float          # capital deployed at entry
-    pnl_usd: float
+    capital_usd: float          # capital deployed at entry (notional at fill)
+    pnl_usd: float              # net of entry + exit commission
     pnl_pct: float
     exit_reason: ExitReason
     days_held: int
     entry_confidence: float
+    commission_usd: float = 0.0  # entry + exit commission for this trade
 
 
 @dataclass
@@ -41,12 +43,14 @@ class EquityPoint:
 class BacktestLedger:
     """Tracks portfolio state through a backtest. All amounts in USD."""
 
-    def __init__(self, initial_capital: float):
+    def __init__(self, initial_capital: float, costs: CostModel | None = None):
         self.initial_capital: float = initial_capital
         self.cash: float = initial_capital
+        self.costs: CostModel = costs if costs is not None else CostModel.zero()
         self.open_positions: dict[str, _OpenPosition] = {}     # symbol → position
         self.closed_trades: list[ClosedTrade] = []
         self.equity_curve: list[EquityPoint] = []
+        self.total_commission_usd: float = 0.0
 
     # ---------- queries ----------
 
@@ -77,16 +81,35 @@ class BacktestLedger:
         capital_usd: float,
         max_holding_days: int,
     ) -> None:
+        """Open a long position.
+
+        ``entry_price`` is the *reference* fill price (e.g. next-bar open);
+        slippage is applied here so the position fills slightly worse, and
+        commission is deducted from cash on top of the deployed notional.
+        """
         if capital_usd <= 0 or entry_price <= 0:
             return
-        if capital_usd > self.cash + 1e-6:
-            # never overdraw
-            capital_usd = self.cash
-        shares = capital_usd / entry_price
-        self.cash -= capital_usd
+        fill = self.costs.entry_fill_price(entry_price)
+
+        # Deploy `capital_usd` of notional, pay commission on top. If cash can't
+        # cover notional + commission, scale the notional down to fit.
+        shares = capital_usd / fill
+        commission = self.costs.commission(fill, shares)
+        if capital_usd + commission > self.cash + 1e-6:
+            capital_usd = max(0.0, self.cash - self.costs.flat_fee_usd)
+            shares = capital_usd / fill
+            commission = self.costs.commission(fill, shares)
+            if capital_usd + commission > self.cash + 1e-6:
+                # still short (tiny cash) — skip rather than overdraw
+                return
+        if capital_usd <= 0 or shares <= 0:
+            return
+
+        self.cash -= capital_usd + commission
+        self.total_commission_usd += commission
         self.open_positions[signal.symbol] = _OpenPosition(
             symbol=signal.symbol,
-            entry_price=entry_price,
+            entry_price=fill,
             entry_date=entry_date,
             shares=shares,
             capital_usd=capital_usd,
@@ -94,6 +117,7 @@ class BacktestLedger:
             stop_loss=signal.stopLoss,
             max_holding_days=max_holding_days,
             entry_confidence=signal.confidence,
+            entry_commission=commission,
         )
 
     def close_position(
@@ -106,16 +130,21 @@ class BacktestLedger:
         pos = self.open_positions.pop(symbol, None)
         if pos is None:
             return None
-        proceeds = pos.shares * exit_price
+        # `exit_price` is the reference exit level (stop/target level or close);
+        # slippage makes the realised fill worse, then exit commission is deducted.
+        fill = self.costs.exit_fill_price(exit_price)
+        exit_commission = self.costs.commission(fill, pos.shares)
+        proceeds = pos.shares * fill - exit_commission
         self.cash += proceeds
-        pnl_usd = proceeds - pos.capital_usd
+        self.total_commission_usd += exit_commission
+        pnl_usd = proceeds - pos.capital_usd - pos.entry_commission
         pnl_pct = pnl_usd / pos.capital_usd if pos.capital_usd > 0 else 0.0
         trade = ClosedTrade(
             symbol=pos.symbol,
             entry_date=pos.entry_date,
             exit_date=exit_date,
             entry_price=pos.entry_price,
-            exit_price=exit_price,
+            exit_price=fill,
             shares=pos.shares,
             capital_usd=pos.capital_usd,
             pnl_usd=pnl_usd,
@@ -123,6 +152,7 @@ class BacktestLedger:
             exit_reason=reason,
             days_held=max(0, (exit_date - pos.entry_date).days),
             entry_confidence=pos.entry_confidence,
+            commission_usd=pos.entry_commission + exit_commission,
         )
         self.closed_trades.append(trade)
         return trade
@@ -171,3 +201,4 @@ class _OpenPosition:
     stop_loss: float | None
     max_holding_days: int
     entry_confidence: float
+    entry_commission: float = 0.0

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from finllm.backtest.costs import PRESETS
 from finllm.backtest.engine import BacktestConfig
 from finllm.backtest.reports import build_metrics, console, render_console, save_run
 from finllm.backtest.strategy_engine import StrategyBacktestEngine
@@ -50,6 +51,12 @@ def main() -> None:
         help="Disable the QQQ uptrend gate (ablation: measure raw setup edge)",
     )
     ap.add_argument(
+        "--costs",
+        choices=sorted(PRESETS),
+        default="midas-us",
+        help="Transaction-cost preset (default: midas-us = $1.5/trade + 5bps slippage)",
+    )
+    ap.add_argument(
         "--out-dir",
         type=Path,
         default=Path("backend/data/backtest_runs"),
@@ -63,7 +70,8 @@ def main() -> None:
     logger.info(f"Universe ({len(symbols)}): {', '.join(symbols)}")
     logger.info(
         f"min_setup_score={args.min_setup_score}  "
-        f"regime_gate={'OFF' if args.no_regime else 'QQQ uptrend'}"
+        f"regime_gate={'OFF' if args.no_regime else 'QQQ uptrend'}  "
+        f"costs={args.costs}"
     )
 
     config = BacktestConfig(
@@ -71,6 +79,7 @@ def main() -> None:
         start=args.start,
         end=args.end,
         initial_capital=args.initial_capital,
+        costs=PRESETS[args.costs],
     )
     engine = StrategyBacktestEngine(
         config,
