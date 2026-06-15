@@ -40,3 +40,4 @@ Thumbs.db
 .idea/
 .vscode/
 backend/data/macro_cache.json
+backend/data/cache/finnhub/

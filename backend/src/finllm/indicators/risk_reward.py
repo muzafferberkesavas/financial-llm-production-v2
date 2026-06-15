@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from finllm.data.finnhub_fundamentals import FinnhubSignals
 from finllm.indicators.fundamentals import FundamentalScore, compute_fundamental_score
 from finllm.markets.base import FundamentalSnapshot
 
@@ -92,15 +93,34 @@ def _quality(fs: FundamentalScore) -> str:
 _QUALITY_MULT = {"strong": 1.15, "ok": 1.0, "weak": 0.82}
 
 
+def _apply_finnhub(fh: FinnhubSignals, reward: float, risk: float, notes: list[str]) -> tuple[float, float]:
+    """Earnings-surprise momentum + analyst consensus nudge reward/risk."""
+    if fh.earnings_momentum == "beating" and (fh.avg_surprise_pct or 0) > 0:
+        reward = min(100.0, reward + 8.0)
+        notes.append(f"earnings beating ({fh.beat_streak}Q streak, avg +{fh.avg_surprise_pct:.1f}%)")
+    elif fh.earnings_momentum == "missing":
+        risk = min(100.0, risk + 12.0)
+        notes.append(f"earnings missing (avg {fh.avg_surprise_pct:+.1f}%)")
+    if fh.analyst_label == "bullish":
+        reward = min(100.0, reward + 5.0)
+        notes.append(f"analyst bullish ({fh.analyst_score:.2f}, n={fh.n_analysts})")
+    elif fh.analyst_label == "bearish":
+        risk = min(100.0, risk + 6.0)
+        notes.append(f"analyst bearish ({fh.analyst_score:.2f})")
+    return reward, risk
+
+
 def score_risk_reward(
     snap: FundamentalSnapshot | None,
     fund_score: FundamentalScore | None = None,
     sector_appetite: float = 0.5,
+    finnhub: FinnhubSignals | None = None,
 ) -> RiskRewardScore:
-    """Fuse fundamentals + macro appetite into a medium-term risk/reward score.
+    """Fuse fundamentals + earnings/analyst signals + macro appetite into a
+    medium-term risk/reward score.
 
-    sector_appetite (0-1, 0.5 neutral) is the macro→sector tailwind from Faz B —
-    it lifts/cuts the composite the same way the sector gate weights confidence.
+    sector_appetite (0-1, 0.5 neutral) is the macro→sector tailwind from Faz B.
+    finnhub adds earnings-surprise momentum + analyst consensus (free signals).
     """
     if snap is None:
         return RiskRewardScore(notes=["no fundamentals"])
@@ -110,6 +130,9 @@ def score_risk_reward(
     reward = _reward(snap, fs, notes)
     risk = _risk(snap, fs, notes)
     quality = _quality(fs)
+
+    if finnhub is not None:
+        reward, risk = _apply_finnhub(finnhub, reward, risk, notes)
 
     # Composite: reward, lifted by quality + macro tailwind, cut by fragility.
     macro_mult = 0.5 + sector_appetite               # [0.5, 1.5]
