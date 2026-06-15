@@ -27,15 +27,29 @@ from finllm.backtest.engine import (
     BacktestConfig,
     BacktestEngine,
 )
+from typing import Callable
+
 from finllm.backtest.strategy_signals import (
     qqq_uptrend,
     strategy_signal,
 )
 from finllm.data.prices import fetch_prices
+from finllm.llm.macro_sector import MacroSectorAnalysis
 from finllm.markets import get_adapter
+from finllm.portfolio.sector_gate import (
+    SectorGateConfig,
+    apply_sector_gate,
+    build_sector_map,
+)
 
 REGIME_SYMBOL = "QQQ"
 MAX_POSITIONS = 7
+
+# A macro provider maps an as-of date (YYYY-MM-DD) to that period's sector view.
+# Injected so the engine never imports the LLM client directly — gate-off passes
+# None, the real run passes an LLM-backed (monthly-cached) provider, tests pass a
+# cheap mock. Returns None when no view is available (→ gate is a no-op that day).
+MacroProvider = Callable[[str], "MacroSectorAnalysis | None"]
 
 
 class StrategyBacktestEngine(BacktestEngine):
@@ -45,6 +59,8 @@ class StrategyBacktestEngine(BacktestEngine):
         min_setup_score: float = 0.5,
         use_regime: bool = True,
         regime_long_period: int | None = 200,
+        sector_gate: SectorGateConfig | None = None,
+        macro_provider: MacroProvider | None = None,
     ):
         super().__init__(config)
         self.min_setup_score = min_setup_score
@@ -53,6 +69,14 @@ class StrategyBacktestEngine(BacktestEngine):
         self.thresholds = get_adapter("nasdaq").thresholds
         self.regime_prices: pd.DataFrame | None = None
         self._regime_cache: dict[pd.Timestamp, bool] = {}
+
+        # Macro→sector gate (Faz B.3). Active only when both a config and a
+        # provider are supplied; macro views are cached per calendar month so a
+        # 3-year backtest costs ~36 LLM calls, not one per trading day.
+        self.sector_gate = sector_gate
+        self.macro_provider = macro_provider
+        self.sector_map: dict[str, str] = build_sector_map() if sector_gate else {}
+        self._macro_cache: dict[str, MacroSectorAnalysis | None] = {}
 
     # ---------- data ----------
 
@@ -150,4 +174,31 @@ class StrategyBacktestEngine(BacktestEngine):
             {s: p for s, p in prices_today.items() if p is not None}
         )
         target_capital = total_value / MAX_POSITIONS  # equal-weight slug
-        return [(signal, target_capital) for signal in fresh]
+
+        if self.sector_gate is None:
+            return [(signal, target_capital) for signal in fresh]
+
+        # Apply the macro→sector gate: filter/veto drops entries, weight scales the
+        # slug by the appetite factor. None analysis → gate is a no-op.
+        analysis = self._macro_for(date)
+        plans: list[tuple] = []
+        for signal in fresh:
+            sector = self.sector_map.get(signal.symbol, "")
+            g = apply_sector_gate(signal.confidence, sector, analysis, self.sector_gate)
+            if not g.keep:
+                continue
+            cap = target_capital
+            if self.sector_gate.mode == "weight" and signal.confidence > 0:
+                cap = target_capital * (g.adjusted_confidence / signal.confidence)
+            plans.append((signal, cap))
+        return plans
+
+    # ---------- macro view (monthly-cached) ----------
+
+    def _macro_for(self, date: pd.Timestamp) -> MacroSectorAnalysis | None:
+        if self.macro_provider is None:
+            return None
+        key = date.strftime("%Y-%m")
+        if key not in self._macro_cache:
+            self._macro_cache[key] = self.macro_provider(date.strftime("%Y-%m-%d"))
+        return self._macro_cache[key]
