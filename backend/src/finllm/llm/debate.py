@@ -113,14 +113,27 @@ class DebateResult:
 
 
 class DebateClient(_BaseClaudeClient):
-    """Sonnet 4.6 — 2-call bull/bear debate + judge per stock."""
+    """Tiered 2-call bull/bear debate + judge per stock (Faz D model tiering).
 
-    name = "claude-sonnet-4-6"
+    The adversary just extracts/anchors bull+bear points from the data → a cheap
+    model (Haiku) suffices. The judge must WEIGH the disagreement and calibrate →
+    a stronger reasoner (Sonnet). This is the research's cheap-analyst/strong-judge
+    pattern; it cuts per-stock cost vs all-Sonnet while protecting the decision.
+    """
 
-    def __init__(self, api_key: str | None = None, model: str | None = None):
+    ADVERSARY_MODEL = "claude-haiku-4-5-20251001"
+    JUDGE_MODEL = "claude-sonnet-4-6"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        adversary_model: str | None = None,
+        judge_model: str | None = None,
+    ):
         super().__init__(api_key=api_key)
-        if model:
-            self.name = model
+        self.adversary_model = adversary_model or self.ADVERSARY_MODEL
+        self.judge_model = judge_model or self.JUDGE_MODEL
+        self.name = self.judge_model
         self._adversary_skill = load_skill("debate-adversary")
         self._judge_skill = load_skill("debate-judge")
 
@@ -130,10 +143,10 @@ class DebateClient(_BaseClaudeClient):
     def debate(self, symbol: str, data_block: str) -> DebateResult:
         result = DebateResult(symbol=symbol, model=self.name)
 
-        # 1) adversary — bull + bear
+        # 1) adversary — bull + bear (cheap model)
         try:
             resp = self._call(
-                model=self.name, system=self._system(self._adversary_skill),
+                model=self.adversary_model, system=self._system(self._adversary_skill),
                 user_content=f"DATA BLOCK for {symbol}:\n\n{data_block}\n\nProduce the debate via the tool.",
                 tools=[DEBATE_TOOL], tool_choice={"type": "tool", "name": "produce_debate"},
                 max_tokens=1200,
@@ -145,7 +158,7 @@ class DebateClient(_BaseClaudeClient):
         d = _extract_tool_input(resp, "produce_debate") or {}
         result.bull_points = [DebatePoint(p.get("claim", ""), p.get("evidence", "")) for p in d.get("bull_points", [])]
         result.bear_points = [DebatePoint(p.get("claim", ""), p.get("evidence", "")) for p in d.get("bear_points", [])]
-        result.cost_usd += _calculate_cost(self.name, resp.usage)
+        result.cost_usd += _calculate_cost(self.adversary_model, resp.usage)
 
         # 2) judge — verdict
         bull_txt = "\n".join(f"+ {p.claim} ({p.evidence})" for p in result.bull_points)
@@ -157,7 +170,7 @@ class DebateClient(_BaseClaudeClient):
         )
         try:
             resp2 = self._call(
-                model=self.name, system=self._system(self._judge_skill),
+                model=self.judge_model, system=self._system(self._judge_skill),
                 user_content=judge_input,
                 tools=[VERDICT_TOOL], tool_choice={"type": "tool", "name": "produce_verdict"},
                 max_tokens=1000,
