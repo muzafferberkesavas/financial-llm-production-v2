@@ -49,20 +49,36 @@ def latest(market: str | None = None) -> dict:
 
 @app.get("/portfolio")
 @app.get("/v2/portfolio")
+@app.get("/v2/portfolio/{market}")
 def portfolio(market: str | None = None) -> dict:
-    """Derive the portfolio view from the latest signals' allocations."""
+    """PortfolioResponse derived from the latest signals' allocations."""
     data = _latest(market)
+    summary = data["summary"]
+    capital = summary.get("total_capital", 10_000.0)
     positions = [
-        {"ticker": s["ticker"], "sector": s.get("sector", ""),
-         "weight_pct": s["allocation_weight"], "action": s["signal"],
-         "confidence": s["confidence"], "cash": s["allocation_cash"]}
+        {
+            "ticker": s["ticker"], "name": s.get("name", ""), "sector": s.get("sector", ""),
+            "signal": s["signal"], "confidence": s["confidence"],
+            "calibrated_probability": s.get("calibrated_probability"),
+            "allocation_weight": s["allocation_weight"], "allocation_cash": s["allocation_cash"],
+            "expected_return_pct": s.get("expected_return_pct"),
+            "time_horizon_days": s.get("time_horizon_days"),
+            "entry_zone_low": s.get("entry_zone_low"), "entry_zone_high": s.get("entry_zone_high"),
+            "stop_loss": s.get("stop_loss"),
+        }
         for s in data["signals"] if s.get("is_actionable")
     ]
+    allocated_total = round(sum(p["allocation_cash"] for p in positions), 2)
     return {
-        "market": data["summary"]["market"],
-        "cash_pct": data["summary"].get("cash_buffer_pct", 100.0),
+        "market": summary["market"],
+        "run_id": summary["run_id"],
+        "as_of": summary.get("started_at", ""),
+        "total_capital": capital,
+        "cash_buffer_pct": summary.get("cash_buffer_pct", 100.0),
+        "allocated_count": len(positions),
+        "allocated_total": allocated_total,
+        "cash_remaining": round(capital - allocated_total, 2),
         "positions": positions,
-        "run_id": data["summary"]["run_id"],
     }
 
 
