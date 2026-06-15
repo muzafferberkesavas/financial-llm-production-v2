@@ -114,16 +114,31 @@ def render_gate(report) -> None:
     gate_t.add_column("Result")
     gate_t.add_column("", justify="center")
     for c in report.checks:
-        mark = "[green]PASS[/green]" if c.passed else "[red]FAIL[/red]"
+        if c.passed is None:
+            mark = "[yellow]N/A[/yellow]"
+        elif c.passed:
+            mark = "[green]PASS[/green]"
+        else:
+            mark = "[red]FAIL[/red]"
         gate_t.add_row(c.name, c.detail, mark)
-    verdict = "[bold green]✓ ROBUSTNESS GATE PASSED[/bold green]" if report.passed \
-        else "[bold red]✗ ROBUSTNESS GATE FAILED[/bold red]"
-    border = "green" if report.passed else "red"
+    if report.passed:
+        suffix = " (bear-robustness UNPROVEN)" if report.has_unproven else ""
+        verdict = f"[bold green]✓ ROBUSTNESS GATE PASSED{suffix}[/bold green]"
+        border = "yellow" if report.has_unproven else "green"
+    else:
+        verdict = "[bold red]✗ ROBUSTNESS GATE FAILED[/bold red]"
+        border = "red"
     console.print(Panel(gate_t, title=verdict, border_style=border))
     if not report.passed:
         console.print(
             "[dim]Strategy is NOT production-ready: do not trust live/LLM signals "
             "on top of it until the gate passes (ARCHITECTURE.md §1 K4).[/dim]"
+        )
+    elif report.has_unproven:
+        console.print(
+            "[dim]All measurable criteria pass, but no market-stress window was in "
+            "range — bear-robustness is unproven. Validate over a crash period before "
+            "full trust.[/dim]"
         )
 
 

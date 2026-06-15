@@ -179,3 +179,30 @@ def equal_weight_benchmark(
         if first > 0:
             rets.append((last / first - 1) * 100)
     return sum(rets) / len(rets) if rets else 0.0
+
+
+def equal_weight_benchmark_curve(
+    prices: dict[str, pd.DataFrame],
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> pd.Series:
+    """Daily equal-weight buy-and-hold index over [start, end], normalized to 1.0
+    at the window's first bar. Used to measure intra-window market stress."""
+    cols: dict[str, pd.Series] = {}
+    for sym, df in prices.items():
+        w = df.loc[(df.index >= start) & (df.index <= end), "close"]
+        if len(w) < 2 or float(w.iloc[0]) <= 0:
+            continue
+        cols[sym] = w / float(w.iloc[0])
+    if not cols:
+        return pd.Series(dtype=float)
+    return pd.DataFrame(cols).ffill().mean(axis=1)
+
+
+def series_max_drawdown_pct(s: pd.Series) -> float:
+    """Max peak-to-trough drawdown of a price/equity series, as a negative %."""
+    if s is None or s.empty:
+        return 0.0
+    running_max = s.cummax()
+    drawdown = (s / running_max - 1) * 100
+    return float(drawdown.min())
