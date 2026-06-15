@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     alpha_vantage_api_key: str | None = Field(default=None, alias="ALPHA_VANTAGE_API_KEY")
     newsapi_key: str | None = Field(default=None, alias="NEWSAPI_KEY")
     polygon_api_key: str | None = Field(default=None, alias="POLYGON_API_KEY")
+    fred_api_key: str | None = Field(default=None, alias="FRED_API_KEY")
 
     # Telegram (Phase 2.3)
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
