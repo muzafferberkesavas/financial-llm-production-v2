@@ -62,7 +62,10 @@ def _headlines(market: str, limit: int) -> list[str]:
     try:
         from finllm.data.news.rss_reader import RssReader
 
-        items = RssReader(market="global").fetch(max_age_hours=48, limit=limit)
+        # DEFAULT_SOURCES are tagged "bist"/"nasdaq" (none "global") — use the
+        # market's own feeds (US: MarketWatch/CNBC/Seeking Alpha) for macro headlines.
+        rss_market = "nasdaq" if market not in ("bist", "nasdaq") else market
+        items = RssReader(market=rss_market).fetch(max_age_hours=48, limit=limit)
         out = []
         for n in items[:limit]:
             when = n.pub_date.strftime("%m-%d") if getattr(n, "pub_date", None) else ""
