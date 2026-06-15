@@ -7,9 +7,12 @@ Usage:
 """
 from __future__ import annotations
 
+import argparse
+
 from rich.console import Console
 from rich.table import Table
 
+from finllm.data.macro import build_macro_context
 from finllm.llm.macro_sector import MacroSectorClient
 
 console = Console()
@@ -31,11 +34,22 @@ a geopolitical bid under gold. USD softening on rate-cut expectations.
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description="Macro→sector smoke test")
+    ap.add_argument("--live", action="store_true", help="Use real live macro data (yfinance+RSS) instead of the sample fixture")
+    args = ap.parse_args()
+
+    if args.live:
+        console.print("[dim]Assembling LIVE macro context (free: yfinance + RSS)…[/dim]")
+        macro_context = build_macro_context(with_news=True, news_limit=10)
+        console.print(f"[dim]{macro_context}[/dim]\n")
+    else:
+        macro_context = SAMPLE_MACRO
+
     client = MacroSectorClient()
     console.print(f"[cyan]Model:[/cyan] {client.name}\n")
     console.print("[dim]Calling Sonnet 4.6 (real API)…[/dim]")
 
-    result = client.analyze(SAMPLE_MACRO)
+    result = client.analyze(macro_context)
 
     console.print(f"\n[bold]Overall stance:[/bold] [yellow]{result.overall_stance}[/yellow]")
     console.print(f"[bold]Macro summary:[/bold] {result.macro_summary}\n")
