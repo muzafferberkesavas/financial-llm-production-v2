@@ -41,6 +41,41 @@ def build_sector_map() -> dict[str, str]:
     return {t.symbol: normalize_sector(t.sector) for t in NASDAQ_ALL}
 
 
+# BIST sectors are labelled in Turkish; map them to the macro layer's GICS canon
+# so the macro→sector overlay (validated +0.25 Sharpe on a broad universe) also
+# works for BIST. Unmapped → "Industrials" fallback (neutral-ish).
+_BIST_TO_GICS = {
+    "Bankacılık": "Financials", "Holding": "Financials", "Sigorta": "Financials",
+    "Finansal Kiralama": "Financials", "Aracı Kurum": "Financials", "Faktoring": "Financials",
+    "Teknoloji": "Technology", "Elektronik": "Technology", "Bilişim": "Technology",
+    "Telekomünikasyon": "Communication Services", "Medya": "Communication Services",
+    "Havacılık": "Industrials", "Savunma": "Industrials", "İnşaat": "Industrials",
+    "Makine": "Industrials", "Ulaştırma": "Industrials", "Lojistik": "Industrials",
+    "Otomotiv": "Consumer Discretionary", "Dayanıklı Tüketim": "Consumer Discretionary",
+    "Tekstil": "Consumer Discretionary", "Turizm": "Consumer Discretionary",
+    "Perakende": "Consumer Discretionary",
+    "Içecek": "Consumer Staples", "Gıda": "Consumer Staples", "Tarım": "Consumer Staples",
+    "Sağlık": "Health Care", "İlaç": "Health Care",
+    "Metal": "Materials", "Demir Çelik": "Materials", "Çelik": "Materials",
+    "Çimento": "Materials", "Cam": "Materials", "Seramik": "Materials",
+    "Ambalaj": "Materials", "Kimya": "Materials", "Petrokimya": "Materials",
+    "Madencilik": "Precious Metals", "Maden": "Precious Metals",
+    "Petrol": "Energy", "Enerji": "Energy", "Elektrik": "Utilities",
+    "GYO": "Real Estate", "Gayrimenkul": "Real Estate",
+}
+
+
+def build_bist_sector_map() -> dict[str, str]:
+    """BIST symbol (.IS) → canonical macro sector, via the Turkish→GICS map."""
+    from finllm.markets.universes.bist_100 import BIST_100_TICKERS
+
+    out: dict[str, str] = {}
+    for t in BIST_100_TICKERS:
+        gics = _BIST_TO_GICS.get(t.sector, "Industrials")
+        out[f"{t.symbol}.IS"] = gics
+    return out
+
+
 @dataclass(slots=True)
 class SectorGateConfig:
     mode: GateMode = "weight"
