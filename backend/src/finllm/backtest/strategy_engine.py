@@ -44,10 +44,12 @@ class StrategyBacktestEngine(BacktestEngine):
         config: BacktestConfig,
         min_setup_score: float = 0.5,
         use_regime: bool = True,
+        regime_long_period: int | None = 200,
     ):
         super().__init__(config)
         self.min_setup_score = min_setup_score
         self.use_regime = use_regime
+        self.regime_long_period = regime_long_period
         self.thresholds = get_adapter("nasdaq").thresholds
         self.regime_prices: pd.DataFrame | None = None
         self._regime_cache: dict[pd.Timestamp, bool] = {}
@@ -97,7 +99,11 @@ class StrategyBacktestEngine(BacktestEngine):
         if cached is not None:
             return cached
         window = self.regime_prices.loc[self.regime_prices.index <= date]
-        ok = qqq_uptrend(window) if not window.empty else False
+        ok = (
+            qqq_uptrend(window, long_sma_period=self.regime_long_period)
+            if not window.empty
+            else False
+        )
         self._regime_cache[date] = ok
         return ok
 

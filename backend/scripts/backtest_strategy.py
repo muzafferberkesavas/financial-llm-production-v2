@@ -51,6 +51,12 @@ def main() -> None:
         help="Disable the QQQ uptrend gate (ablation: measure raw setup edge)",
     )
     ap.add_argument(
+        "--regime-long-period",
+        type=int,
+        default=200,
+        help="QQQ long-term SMA bull/bear filter period (0 = disable, classic 200)",
+    )
+    ap.add_argument(
         "--costs",
         choices=sorted(PRESETS),
         default="midas-us",
@@ -85,6 +91,7 @@ def main() -> None:
         config,
         min_setup_score=args.min_setup_score,
         use_regime=not args.no_regime,
+        regime_long_period=args.regime_long_period or None,
     )
     result = engine.run()
 

@@ -136,6 +136,12 @@ def main() -> None:
     ap.add_argument("--step-months", type=int, default=3)
     ap.add_argument("--min-setup-score", type=float, default=0.5)
     ap.add_argument("--no-regime", action="store_true")
+    ap.add_argument(
+        "--regime-long-period",
+        type=int,
+        default=200,
+        help="QQQ long-term SMA bull/bear filter period (0 = disable, classic 200)",
+    )
     ap.add_argument("--costs", choices=sorted(PRESETS), default="midas-us")
     args = ap.parse_args()
 
@@ -153,6 +159,7 @@ def main() -> None:
         step_months=args.step_months,
         min_setup_score=args.min_setup_score,
         use_regime=not args.no_regime,
+        regime_long_period=args.regime_long_period or None,
     )
     if not results:
         raise SystemExit("no windows produced results")

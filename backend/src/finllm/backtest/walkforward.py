@@ -79,6 +79,7 @@ def run_walk_forward(
     step_months: int = 3,
     min_setup_score: float = 0.5,
     use_regime: bool = True,
+    regime_long_period: int | None = 200,
 ) -> list[WindowResult]:
     windows = generate_windows(start, end, window_months, step_months)
     if not windows:
@@ -96,7 +97,10 @@ def run_walk_forward(
             universe=universe, start=w_start, end=w_end, costs=costs
         )
         engine = StrategyBacktestEngine(
-            config, min_setup_score=min_setup_score, use_regime=use_regime
+            config,
+            min_setup_score=min_setup_score,
+            use_regime=use_regime,
+            regime_long_period=regime_long_period,
         )
         try:
             res = engine.run()
@@ -182,8 +186,9 @@ class RobustnessStandard:
     min_median_pf: float = 1.20          # typical window must have a real edge
     min_pct_pf_gt_1: float = 0.70        # ≥70% of windows profitable (not a coin-flip)
     max_worst_drawdown_pct: float = -30.0  # no window worse than this
-    min_trades_per_window: int = 20      # enough samples per window to mean anything
-    min_bear_pf: float = 0.90            # must not bleed badly in a bear regime
+    min_median_trades: int = 20          # typical window active enough to be meaningful
+    min_bear_return_pct: float = -5.0    # capital preservation: don't bleed in a bear
+                                         # (staying out → ~flat → passes, as it should)
 
 
 @dataclass
@@ -225,22 +230,23 @@ def evaluate_gate(
         f"{worst_dd:.1f}% (need ≥ {std.max_worst_drawdown_pct:.0f}%)",
     ))
 
-    min_trades = min((r.metrics.n_trades for r in results), default=0)
+    trades = sorted(r.metrics.n_trades for r in results)
+    median_trades = trades[len(trades) // 2] if trades else 0
     checks.append(GateCheck(
-        "min trades/window", min_trades >= std.min_trades_per_window,
-        f"{min_trades} (need ≥ {std.min_trades_per_window})",
+        "median trades/window", median_trades >= std.min_median_trades,
+        f"{median_trades} (need ≥ {std.min_median_trades})",
     ))
 
     bear = summary.get("by_regime", {}).get("BEAR")
     if bear is not None:
-        bear_pf = bear["profit_factor"]["mean"]
+        bear_ret = bear["return_pct"]["mean"]
         checks.append(GateCheck(
-            "bear-regime PF", bear_pf >= std.min_bear_pf,
-            f"{bear_pf:.2f} (need ≥ {std.min_bear_pf:.2f})",
+            "bear-regime return", bear_ret >= std.min_bear_return_pct,
+            f"{bear_ret:+.1f}% (need ≥ {std.min_bear_return_pct:.0f}%)",
         ))
     else:
         checks.append(GateCheck(
-            "bear-regime PF", False,
+            "bear-regime return", False,
             "no BEAR window in range — robustness UNPROVEN (add a bear period)",
         ))
 

@@ -181,14 +181,22 @@ def strategy_signal(
 
 # ---------- QQQ trend-regime gate ----------
 
-def qqq_uptrend(qqq_prices: pd.DataFrame) -> bool:
+def qqq_uptrend(qqq_prices: pd.DataFrame, long_sma_period: int | None = 200) -> bool:
     """True when QQQ is in an uptrend (not sideways/down) on the last bar.
 
-    Definition mirrors the user's manual rule "QQQ yükseliş trendinde mi":
+    Short/medium-term definition (the user's manual rule "QQQ yükseliş trendinde mi"):
       * close > EMA21  (above short-term trend)
       * EMA21 > EMA50  (stacked, momentum up)
       * close today > close 20 bars ago  (positive medium-term slope)
-    All three must hold. Causal — uses only bars up to today.
+
+    Long-term regime guard (``long_sma_period``, default 200): also require
+      * close > SMA(long_sma_period)  (above the long-term trend)
+    This is the classic 200-day-MA bull/bear filter. In a bear (e.g. 2022) the
+    index sits below its 200-DMA for months and bear rallies rarely reclaim it,
+    so this gate keeps the strategy out of exactly the regime where its edge
+    inverts. Set ``long_sma_period=None`` to disable (ablation).
+
+    All active conditions must hold. Causal — uses only bars up to today.
     """
     if len(qqq_prices) < 50:
         return False
@@ -199,4 +207,12 @@ def qqq_uptrend(qqq_prices: pd.DataFrame) -> bool:
     if ema21 is None or ema50 is None:
         return False
     close_20_ago = float(closes.iloc[-21]) if len(closes) >= 21 else close
-    return close > ema21 and ema21 > ema50 and close > close_20_ago
+    if not (close > ema21 and ema21 > ema50 and close > close_20_ago):
+        return False
+    if long_sma_period:
+        if len(closes) < long_sma_period:
+            return False
+        sma_long = float(closes.tail(long_sma_period).mean())
+        if close <= sma_long:
+            return False
+    return True
