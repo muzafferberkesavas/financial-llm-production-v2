@@ -69,6 +69,7 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 | **K1** Data Perception | `pipeline/stage0_ingest`, `stage0b_agenda` (news), `indicators/fundamentals`, `features/technical` | ✅ Var |
 | **K2** Makro→Sektör (top-down) | `pipeline/regime` (kısmî), `strategies/sector_rotation` | ⚠️ **Eksik: gerçek LLM makro→sektör katmanı** |
 | **K2** Analist ajanları | `pipeline/stage1_filter`, `stage1b_setup`, `stage1c_features`, `stage2_screen`, `stage3_deep` | 🟡 Var ama tek-akış (debate yok) |
+| **K2** Risk/getiri füzyonu | `indicators/risk_reward` (temel+finnhub+makro) + `signals/ranking` (birleşik öncelik) | ✅ **YENİ (2026-06-15)** — teknik+temel+earnings/analyst+makro → tek orta-vade öncelik skoru |
 | **K3** Bull/Bear debate | — | ❌ **Yok — eklenecek** |
 | **K3** Trader sentezi + risk | `pipeline/stage4_judge`, `ensemble/multi_llm_voter` | 🟡 Judge var, çok-yönlü risk ekibi yok |
 | **K4** Backtest gate | `pipeline/stage4_5_backtest_gate`, `backtest/engine`, `strategy_engine` | ✅ Var — **korunacak & sertleştirilecek** |
