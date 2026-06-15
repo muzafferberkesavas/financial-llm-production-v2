@@ -38,10 +38,11 @@ def parse_date(s: str) -> datetime:
     return datetime.strptime(s, "%Y-%m-%d")
 
 
-def run_one(symbols, start, end, gate, provider, min_setup_score):
+def run_one(symbols, start, end, gate, provider, min_setup_score, sector_map=None):
     cfg = BacktestConfig(universe=symbols, start=start, end=end)
     eng = StrategyBacktestEngine(
-        cfg, min_setup_score=min_setup_score, sector_gate=gate, macro_provider=provider
+        cfg, min_setup_score=min_setup_score, sector_gate=gate, macro_provider=provider,
+        sector_map=sector_map,
     )
     res = eng.run()
     m = build_metrics(res)
@@ -63,6 +64,11 @@ def main() -> None:
 
     symbols = resolve(args.universe)
     modes = [m.strip() for m in args.modes.split(",") if m.strip()]
+    # Broad universe carries its own sector map (names outside NASDAQ_ALL).
+    sector_map = None
+    if args.universe.lower().strip() == "broad":
+        from finllm.backtest.universe import BROAD_UNIVERSE
+        sector_map = dict(BROAD_UNIVERSE)
 
     stats = None
     if args.mock:
@@ -76,7 +82,7 @@ def main() -> None:
     for mode in modes:
         gate = None if mode == "off" else SectorGateConfig(mode=mode)
         prov = None if mode == "off" else provider
-        m, n_trades, mcache = run_one(symbols, args.start, args.end, gate, prov, args.min_setup_score)
+        m, n_trades, mcache = run_one(symbols, args.start, args.end, gate, prov, args.min_setup_score, sector_map)
         rows.append((mode, m, n_trades))
         console.print(f"  ran [bold]{mode}[/bold]: return {m.total_return_pct:+.1f}%  PF {m.profit_factor:.2f}  trades {n_trades}")
 

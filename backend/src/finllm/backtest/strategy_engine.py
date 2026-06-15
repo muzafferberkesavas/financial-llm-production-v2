@@ -63,6 +63,7 @@ class StrategyBacktestEngine(BacktestEngine):
         macro_provider: MacroProvider | None = None,
         fundamental_provider: Callable[[str, str], "float | None"] | None = None,
         fundamental_weight: float = 0.0,
+        sector_map: dict[str, str] | None = None,
     ):
         super().__init__(config)
         self.min_setup_score = min_setup_score
@@ -83,7 +84,12 @@ class StrategyBacktestEngine(BacktestEngine):
         # 3-year backtest costs ~36 LLM calls, not one per trading day.
         self.sector_gate = sector_gate
         self.macro_provider = macro_provider
-        self.sector_map: dict[str, str] = build_sector_map() if sector_gate else {}
+        # sector_map override lets a broader (non-NASDAQ_ALL) universe carry its
+        # own symbol→sector mapping for the macro gate.
+        if sector_map is not None:
+            self.sector_map = sector_map
+        else:
+            self.sector_map = build_sector_map() if sector_gate else {}
         self._macro_cache: dict[str, MacroSectorAnalysis | None] = {}
 
     # ---------- data ----------
