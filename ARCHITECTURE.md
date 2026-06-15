@@ -75,6 +75,7 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 | **K3** Orchestration | `pipeline/decision_panel` (ranking→top-N debate→hüküm) | ✅ **YENİ (2026-06-16)** — uçtan uca çalışıyor, `scripts/run_decision_panel.py` |
 | **K4** Backtest gate | `pipeline/stage4_5_backtest_gate`, `backtest/engine`, `strategy_engine` | ✅ Var — **korunacak & sertleştirilecek** |
 | **K4** Pozisyon/kalibrasyon | `calibration/kelly`, `calibration/platt`, `calibration/tracker` | ✅ Var |
+| **K4** Portföy inşası | `portfolio/construction` (debate hükümleri → risk-limitli tahsis) | ✅ **YENİ (2026-06-16)** — max pozisyon/single-name/sektör/exposure cap, nakit korur |
 | **K4** Writer/çıktı | `pipeline/stage5_writer` | ✅ Var |
 
 **Özet:** Sistem %70 hazır. 3 büyük boşluk: (a) LLM makro→sektör top-down katmanı, (b) bull/bear debate, (c) backtest gate'in 5-hata'ya karşı sertleştirilmesi.
