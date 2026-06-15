@@ -43,6 +43,8 @@ from finllm.portfolio.sector_gate import (
 )
 
 REGIME_SYMBOL = "QQQ"
+# Per-market regime benchmark for the backtest's trend gate (Faz E).
+REGIME_BY_MARKET = {"nasdaq": "QQQ", "bist": "XU100.IS"}
 MAX_POSITIONS = 7
 
 # A macro provider maps an as-of date (YYYY-MM-DD) to that period's sector view.
@@ -64,12 +66,15 @@ class StrategyBacktestEngine(BacktestEngine):
         fundamental_provider: Callable[[str, str], "float | None"] | None = None,
         fundamental_weight: float = 0.0,
         sector_map: dict[str, str] | None = None,
+        market: str = "nasdaq",
     ):
         super().__init__(config)
         self.min_setup_score = min_setup_score
         self.use_regime = use_regime
         self.regime_long_period = regime_long_period
-        self.thresholds = get_adapter("nasdaq").thresholds
+        self.market = market
+        self.thresholds = get_adapter(market).thresholds
+        self.regime_symbol = REGIME_BY_MARKET.get(market, REGIME_SYMBOL)
         self.regime_prices: pd.DataFrame | None = None
         self._regime_cache: dict[pd.Timestamp, bool] = {}
 
@@ -117,7 +122,7 @@ class StrategyBacktestEngine(BacktestEngine):
         warmup_start = (self.config.start - timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
         end_str = self.config.end.strftime("%Y-%m-%d")
         try:
-            qqq = fetch_prices(REGIME_SYMBOL, start=warmup_start, end=end_str, use_cache=True)
+            qqq = fetch_prices(self.regime_symbol, start=warmup_start, end=end_str, use_cache=True)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"QQQ regime fetch failed ({e}) — running WITHOUT regime gate")
             self.use_regime = False

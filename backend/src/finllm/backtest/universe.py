@@ -83,6 +83,9 @@ def resolve(name_or_list: str) -> list[str]:
     key = name_or_list.lower().strip()
     if key == "broad":
         return list(BROAD_UNIVERSE.keys())
+    if key in ("bist", "bist100"):
+        from finllm.markets.universes.bist_100 import BIST_100_TICKERS
+        return [f"{t.symbol}.IS" for t in BIST_100_TICKERS]
     if key in _LAZY:
         return _nasdaq_symbols(_LAZY[key])
     if key in UNIVERSES:
