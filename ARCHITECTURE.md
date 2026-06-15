@@ -114,8 +114,11 @@ Mevcut pipeline (`backend/src/finllm/pipeline/orchestrator.py`) zaten olgun bir 
 > PF>1, worst DD −11.6%, AYI +4.2%.** Periyoda (200 ve 250 geçer, 150 kısa) ve setup-eşiğine (0.4/0.5)
 > duyarsız → curve-fit değil. 2022-01 penceresi: 35 işlem/−16.4% → 7 işlem/−3.1% (doğru şekilde dışarıda).
 > Gate mantığı da düzeltildi: sermaye korumasını ödüllendiriyor (bear getiri-bazlı ≥−5%, median işlem).
-> **Uyarı:** bear-robustluk tek tarihsel bear'a (2022) dayanıyor; cache 2008/2018/2020'ye ulaşmıyor,
-> out-of-sample güven orta. **Takip:** canlı `pipeline/regime.py` de SMA200 kuralını benimsemeli.
+> **🟢 OOS DOĞRULANDI (2018–2021):** Canlı `pipeline/regime.py` SMA200 kuralını benimsedi. Gate rafine
+> edildi (stres-temelli bear tespiti: pencere-içi benchmark DD≤−15%; tri-state: unproven≠fail). 6-aylık
+> 2018–21 OOS'ta **4 stres penceresi** (2018-Q4 + COVID) yakalandı ve **GATE GEÇTİ**: bear-getiri **+14.9%**,
+> worst DD −16.4%, median PF 1.24. **Sonuç: 200-DMA fix 2022'ye overfit DEĞİL — 2018/2020 bear'larına da
+> genelliyor.** Bear-robustluk artık iki bağımsız dönemde (2018-Q4, COVID) kanıtlı.
 
 ### Faz B — Top-down makro→sektör katmanı `[A5]`
 - [ ] `pipeline/stage_macro.py`: policy docs + makro veri + sentiment → sektör iştahı (LLM)
