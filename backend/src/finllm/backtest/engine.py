@@ -23,7 +23,6 @@ from loguru import logger
 from finllm.backtest.ledger import BacktestLedger
 from finllm.backtest.signals import DEFAULT_HOLDING_MAX, technical_signal
 from finllm.data.prices import fetch_prices
-from finllm.features.technical import add_technical_features
 from finllm.portfolio.exits import evaluate_exit
 from finllm.portfolio.models import ExitReason
 from finllm.portfolio.sizing import compute_weights, select_buy_candidates
@@ -64,6 +63,11 @@ class BacktestEngine:
     # ---------- setup ----------
 
     def _load_data(self) -> None:
+        # Lazy import: the generic technical-blend backtest needs pandas-ta, but
+        # the strategy backtest (which overrides _load_data) does not — keeping
+        # this import here lets the strategy path run without pandas-ta.
+        from finllm.features.technical import add_technical_features
+
         warmup_start = (self.config.start - timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
         end_str = self.config.end.strftime("%Y-%m-%d")
 
