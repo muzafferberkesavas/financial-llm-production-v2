@@ -29,10 +29,11 @@ MACRO_TICKERS = {
 INDEX_KEYS = {"S&P500", "Nasdaq100"}  # ones where 200-DMA position is meaningful
 
 
-def _series(name: str, ticker: str) -> pd.DataFrame | None:
-    start = (datetime.utcnow() - timedelta(days=400)).strftime("%Y-%m-%d")
+def _series(name: str, ticker: str, as_of: str | None = None) -> pd.DataFrame | None:
+    end = as_of or datetime.utcnow().strftime("%Y-%m-%d")
+    start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=400)).strftime("%Y-%m-%d")
     try:
-        df = fetch_prices(ticker, start=start, use_cache=True)
+        df = fetch_prices(ticker, start=start, end=end, use_cache=True)
         return df if not df.empty else None
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[MACRO] {name} ({ticker}) fetch failed: {e}")
@@ -80,12 +81,18 @@ def build_macro_context(
     market: str = "nasdaq",
     news_limit: int = 12,
     with_news: bool = True,
+    as_of: str | None = None,
 ) -> str:
-    """Assemble a MACRO CONTEXT block from free live data. Degrades gracefully:
-    any failed source is simply omitted (the LLM flags thin context)."""
-    frames = {name: _series(name, tk) for name, tk in MACRO_TICKERS.items()}
+    """Assemble a MACRO CONTEXT block from free sources. Degrades gracefully:
+    any failed source is omitted (the LLM flags thin context).
 
-    regime, rates, commodities, usd = [], [], [], []
+    `as_of` (YYYY-MM-DD) makes the whole block point-in-time for historical
+    backtests — prices are sliced to that date, FRED queried as-of, and live RSS
+    news (which has no history) is skipped automatically.
+    """
+    frames = {name: _series(name, tk, as_of) for name, tk in MACRO_TICKERS.items()}
+
+    regime, rates_yf, commodities, usd = [], [], [], []
     for name, df in frames.items():
         if df is None:
             continue
@@ -93,26 +100,37 @@ def build_macro_context(
         if name in ("VIX", "S&P500", "Nasdaq100"):
             regime.append(line)
         elif name in ("US10Y", "US13W"):
-            rates.append(line)
+            rates_yf.append(line)
         elif name in ("Gold", "Oil_WTI"):
             commodities.append(line)
         elif name == "USD_DXY":
             usd.append(line)
 
     blocks: list[str] = []
-    blocks.append(
-        "[RATES] (point-in-time Fed decision/CPI/PCE/NFP unavailable without FRED — flag as thin)\n"
-        + ("\n".join(rates) if rates else "n/a")
-    )
+
+    # Rates / inflation / employment: prefer FRED (real prints, point-in-time);
+    # fall back to yfinance yields + a thin-context flag when no FRED key.
+    from finllm.data.fred import fred_macro_block
+
+    fred = fred_macro_block(as_of=as_of)
+    if fred:
+        blocks.append(fred)
+    else:
+        blocks.append(
+            "[RATES] (CPI/PCE/NFP/Fed decision unavailable — no FRED key, flag as thin)\n"
+            + ("\n".join(rates_yf) if rates_yf else "n/a")
+        )
+
     blocks.append("[MARKET REGIME]\n" + ("\n".join(regime) if regime else "n/a"))
     blocks.append("[COMMODITIES]\n" + ("\n".join(commodities) if commodities else "n/a"))
     blocks.append("[USD]\n" + ("\n".join(usd) if usd else "n/a"))
 
-    if with_news:
+    # Live RSS news has no history → only include for the live (as_of=None) path.
+    if with_news and as_of is None:
         heads = _headlines(market, news_limit)
         blocks.append("[HEADLINES] (last 48h)\n" + ("\n".join(heads) if heads else "n/a"))
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    stamp = as_of or datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     return f"[AS OF] {stamp}\n\n" + "\n\n".join(blocks)
 
 
