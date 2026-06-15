@@ -22,12 +22,17 @@ from finllm.backtest.engine import BacktestConfig
 from finllm.backtest.reports import build_metrics
 from finllm.backtest.strategy_engine import StrategyBacktestEngine
 from finllm.backtest.universe import resolve
+from finllm.backtest.universe import BROAD_UNIVERSE
 from finllm.data.finnhub_pit import fetch_pit_fundamentals
 from finllm.indicators.risk_reward import score_risk_reward
+from finllm.markets.base import Ticker
 from finllm.markets.universes.nasdaq import NASDAQ_ALL
 
 console = Console()
 _TMAP = {t.symbol: t for t in NASDAQ_ALL}
+# Broad-universe names not in NASDAQ_ALL get a Ticker built from their sector label.
+for _sym, _sec in BROAD_UNIVERSE.items():
+    _TMAP.setdefault(_sym, Ticker(_sym, "nasdaq", sector=_sec))
 
 
 def parse_date(s: str) -> datetime:
