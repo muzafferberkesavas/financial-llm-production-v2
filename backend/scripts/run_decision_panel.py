@@ -22,11 +22,23 @@ from finllm.data.finnhub_fundamentals import fetch_finnhub_signals
 from finllm.data.fundamentals import fetch_fundamentals
 from finllm.data.prices import fetch_prices
 from finllm.markets import get_adapter
-from finllm.markets.universes.nasdaq import NASDAQ_ALL
 from finllm.pipeline.decision_panel import CandidateInput, run_decision_panel
 
 console = Console()
-_TMAP = {t.symbol: t for t in NASDAQ_ALL}
+
+DEFAULTS = {
+    "nasdaq": "AAPL,NVDA,XOM,MU,JPM,AMD,META,CAT,AMZN,AVGO",
+    "bist": "THYAO.IS,GARAN.IS,ASELS.IS,AKBNK.IS,KCHOL.IS,EREGL.IS,BIMAS.IS,SISE.IS,TUPRS.IS,FROTO.IS",
+}
+
+
+def build_tmap(market: str) -> dict:
+    """symbol → Ticker. BIST keyed by the yahoo '.IS' symbol the data layer uses."""
+    if market == "bist":
+        from finllm.markets.universes.bist_100 import BIST_100_TICKERS
+        return {f"{t.symbol}.IS": t for t in BIST_100_TICKERS}
+    from finllm.markets.universes.nasdaq import NASDAQ_ALL
+    return {t.symbol: t for t in NASDAQ_ALL}
 
 
 def _setup_score(symbol: str, thresholds) -> float | None:
@@ -43,7 +55,8 @@ def _setup_score(symbol: str, thresholds) -> float | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="End-to-end decision panel")
-    ap.add_argument("--symbols", default="AAPL,NVDA,XOM,MU,JPM,AMD,META,CAT,AMZN,AVGO")
+    ap.add_argument("--market", choices=["nasdaq", "bist"], default="nasdaq")
+    ap.add_argument("--symbols", default=None, help="comma list; defaults per market")
     ap.add_argument("--top-n", type=int, default=4)
     ap.add_argument("--no-debate", action="store_true")
     ap.add_argument("--no-macro", action="store_true")
@@ -51,19 +64,21 @@ def main() -> None:
                     help="write the panel as signals_<market>.json for the dashboard API")
     args = ap.parse_args()
 
-    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-    thresholds = get_adapter("nasdaq").thresholds
+    market = args.market
+    tmap = build_tmap(market)
+    symbols = [s.strip().upper() for s in (args.symbols or DEFAULTS[market]).split(",") if s.strip()]
+    thresholds = get_adapter(market).thresholds
 
     # 1) assemble candidate inputs (real setups + fundamentals + finnhub)
-    console.print("[dim]Assembling candidates (setups + fundamentals + Finnhub, free)…[/dim]")
+    console.print(f"[dim]Assembling {market} candidates (setups + fundamentals + Finnhub, free)…[/dim]")
     inputs: list[CandidateInput] = []
     for sym in symbols:
-        t = _TMAP.get(sym)
+        t = tmap.get(sym)
         if t is None:
             continue
         setup = _setup_score(sym, thresholds)
         snap = fetch_fundamentals(t, sym, use_cache=True)
-        fh = fetch_finnhub_signals(sym)
+        fh = fetch_finnhub_signals(sym) if market == "nasdaq" else None  # Finnhub US-only
         inputs.append(CandidateInput(symbol=sym, setup_score=setup or 0.0, snap=snap, finnhub=fh))
 
     # 2) macro view (1 call) unless disabled
@@ -134,11 +149,11 @@ def main() -> None:
         port = construct_portfolio(result.decisions) if result.actionable() else None
         commodities = fetch_commodities()
         payload = panel_to_response(
-            result, port, market="nasdaq",
+            result, port, market=market,
             macro_stance=(macro.overall_stance if macro else ""), macro=macro,
             commodities=commodities,
         )
-        path = write_signals_file(payload, "nasdaq")
+        path = write_signals_file(payload, market)
         console.print(f"[green]Exported[/green] {len(payload['signals'])} signals → {path}")
 
 
