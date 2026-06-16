@@ -94,12 +94,15 @@ def build_debate_block(
     sector_appetite: float = 0.5,
     rr: RiskRewardScore | None = None,
     news: list[str] | None = None,
+    momentum: float | None = None,
 ) -> str:
     """Assemble the per-stock DATA BLOCK fed to the Faz C debate — all signals in
     one text view so bull/bear arguments can anchor to specific figures."""
     rr = rr or score_risk_reward(snap, None, sector_appetite, finnhub)
     lines = [f"[{symbol}] medium-term long candidate", ""]
     lines.append(f"[TECHNICAL] setup score {setup_score:.2f} (0-1; entry-timing quality)")
+    if momentum is not None:
+        lines.append(f"[MOMENTUM] 12-1m price momentum {momentum * 100:+.0f}% (real factor; positive = trend)")
 
     if snap is not None:
         lines += [

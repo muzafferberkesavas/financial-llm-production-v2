@@ -41,16 +41,19 @@ def build_tmap(market: str) -> dict:
     return {t.symbol: t for t in NASDAQ_ALL}
 
 
-def _setup_score(symbol: str, thresholds) -> float | None:
+def _setup_and_momentum(symbol: str, thresholds) -> tuple[float | None, float | None]:
+    """Technical setup score + 12-1m momentum from one cached price fetch."""
     from finllm.backtest.strategy_signals import MIN_BARS, strategy_signal
+    from finllm.indicators.momentum import momentum_12_1
     try:
-        p = fetch_prices(symbol, start="2024-01-01", use_cache=True)
+        p = fetch_prices(symbol, start="2023-06-01", use_cache=True)
     except Exception:
-        return None
+        return None, None
     if p.empty or len(p) < MIN_BARS:
-        return None
+        return None, None
     sig = strategy_signal(symbol, p, datetime.utcnow(), thresholds, min_setup_score=0.0)
-    return sig.signals.technical.score if sig else None
+    setup = sig.signals.technical.score if sig else None
+    return setup, momentum_12_1(p)
 
 
 def main() -> None:
@@ -76,10 +79,10 @@ def main() -> None:
         t = tmap.get(sym)
         if t is None:
             continue
-        setup = _setup_score(sym, thresholds)
+        setup, mom = _setup_and_momentum(sym, thresholds)
         snap = fetch_fundamentals(t, sym, use_cache=True)
         fh = fetch_finnhub_signals(sym) if market == "nasdaq" else None  # Finnhub US-only
-        inputs.append(CandidateInput(symbol=sym, setup_score=setup or 0.0, snap=snap, finnhub=fh))
+        inputs.append(CandidateInput(symbol=sym, setup_score=setup or 0.0, snap=snap, finnhub=fh, momentum=mom))
 
     # BIST enrichment: relative (percentile) scoring instead of US benchmarks +
     # KAP/Turkish news for the debate.

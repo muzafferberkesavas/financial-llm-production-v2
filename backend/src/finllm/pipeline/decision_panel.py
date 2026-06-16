@@ -33,6 +33,7 @@ class CandidateInput:
     finnhub: FinnhubSignals | None = None
     rr: object = None    # precomputed RiskRewardScore (e.g. BIST-relative); overrides
     news: list = field(default_factory=list)  # extra context (KAP/Turkish news)
+    momentum: float | None = None  # 12-1m price momentum (factor for the debate)
 
 
 @dataclass(slots=True)
@@ -96,6 +97,7 @@ def run_decision_panel(
         block = build_debate_block(
             cs.symbol, cs.setup_score, inp.snap,
             finnhub=inp.finnhub, sector_appetite=cs.macro_appetite, news=inp.news,
+            momentum=inp.momentum,
         )
         d = debate_client.debate(cs.symbol, block)
         result.total_cost_usd += d.cost_usd
