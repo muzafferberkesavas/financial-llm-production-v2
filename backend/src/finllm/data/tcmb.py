@@ -19,7 +19,7 @@ import httpx
 from finllm.config.settings import settings
 from finllm.utils.logging import logger
 
-_BASE = "https://evds2.tcmb.gov.tr/service/evds"
+_BASE = "https://evds3.tcmb.gov.tr/service/evds"
 
 # EVDS series codes (frequency in comment). Adjust if EVDS renames them.
 SERIES = {
@@ -46,7 +46,7 @@ def _fetch(series: str, months: int = 18) -> list[tuple[str, float]]:
         "type": "json",
     }
     try:
-        r = httpx.get(_BASE, params=params, headers={"key": key}, timeout=20)
+        r = httpx.get(_BASE, params=params, headers={"key": key}, timeout=20, follow_redirects=True)
         r.raise_for_status()
         col = series.replace(".", "_")
         out = []
