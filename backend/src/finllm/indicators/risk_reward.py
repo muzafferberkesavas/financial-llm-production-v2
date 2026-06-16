@@ -94,13 +94,25 @@ _QUALITY_MULT = {"strong": 1.15, "ok": 1.0, "weak": 0.82}
 
 
 def _apply_finnhub(fh: FinnhubSignals, reward: float, risk: float, notes: list[str]) -> tuple[float, float]:
-    """Earnings-surprise momentum + analyst consensus nudge reward/risk."""
+    """Earnings-surprise momentum + PEAD drift + analyst consensus nudge reward/risk."""
+    from finllm.indicators.pead import pead_label, pead_score
+
     if fh.earnings_momentum == "beating" and (fh.avg_surprise_pct or 0) > 0:
         reward = min(100.0, reward + 8.0)
         notes.append(f"earnings beating ({fh.beat_streak}Q streak, avg +{fh.avg_surprise_pct:.1f}%)")
     elif fh.earnings_momentum == "missing":
         risk = min(100.0, risk + 12.0)
         notes.append(f"earnings missing (avg {fh.avg_surprise_pct:+.1f}%)")
+
+    # PEAD: active drift in the window right after the print (research-validated).
+    pead = pead_score(fh)
+    lab = pead_label(pead)
+    if lab == "drift-up":
+        reward = min(100.0, reward + (pead - 50) / 50 * 10)
+        notes.append(f"PEAD drift-up (surprise {fh.last_surprise_pct:+.1f}%, recent print)")
+    elif lab == "drift-down":
+        risk = min(100.0, risk + (50 - pead) / 50 * 10)
+        notes.append(f"PEAD drift-down (surprise {fh.last_surprise_pct:+.1f}%, recent print)")
     if fh.analyst_label == "bullish":
         reward = min(100.0, reward + 5.0)
         notes.append(f"analyst bullish ({fh.analyst_score:.2f}, n={fh.n_analysts})")

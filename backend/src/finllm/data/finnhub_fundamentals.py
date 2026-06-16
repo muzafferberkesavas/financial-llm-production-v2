@@ -33,6 +33,8 @@ class FinnhubSignals:
     analyst_score: float | None = None      # 0-1 (1 = all strong buy)
     analyst_label: str = "unknown"          # bullish | neutral | bearish | unknown
     n_analysts: int = 0
+    last_earnings_date: str | None = None    # most recent reported period (PEAD recency)
+    last_surprise_pct: float | None = None   # that quarter's surprise (PEAD direction/SUE)
 
     def as_dict(self) -> dict:
         return {
@@ -42,6 +44,8 @@ class FinnhubSignals:
             "analyst_score": self.analyst_score,
             "analyst_label": self.analyst_label,
             "n_analysts": self.n_analysts,
+            "last_earnings_date": self.last_earnings_date,
+            "last_surprise_pct": self.last_surprise_pct,
         }
 
 
@@ -116,9 +120,21 @@ def fetch_finnhub_signals(symbol: str, use_cache: bool = True) -> FinnhubSignals
 
     avg, streak, nq, momentum = _earnings(eps if isinstance(eps, list) else None)
     a_score, a_label, n_an = _analyst(reco if isinstance(reco, list) else None)
+    # Most recently REPORTED quarter (skip upcoming/future periods) for PEAD.
+    last_date = last_sp = None
+    if isinstance(eps, list) and eps:
+        from datetime import datetime as _dt
+
+        today = _dt.utcnow().strftime("%Y-%m-%d")
+        for e in eps:  # newest first
+            per = e.get("period", "")
+            if e.get("actual") is not None and per and per[:10] <= today:
+                last_date, last_sp = per, e.get("surprisePercent")
+                break
     sig = FinnhubSignals(
         avg_surprise_pct=avg, beat_streak=streak, n_quarters=nq, earnings_momentum=momentum,
         analyst_score=a_score, analyst_label=a_label, n_analysts=n_an,
+        last_earnings_date=last_date, last_surprise_pct=last_sp,
     )
     try:
         cache.parent.mkdir(parents=True, exist_ok=True)
