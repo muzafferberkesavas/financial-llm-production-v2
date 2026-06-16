@@ -7,14 +7,18 @@ from functools import lru_cache
 from finllm.config.settings import DATA_DIR
 
 
-@lru_cache(maxsize=1)
-def _load_sp500() -> list[dict]:
-    """The production-scale S&P 500 universe (scripts/fetch_sp500_universe.py).
+@lru_cache(maxsize=2)
+def _load_universe_json(name: str) -> list[dict]:
+    """Load a saved universe (sp500.json / bist100.json — fetch_*_universe.py).
     Empty list if not fetched yet — caller falls back to a named universe."""
-    path = DATA_DIR / "universes" / "sp500.json"
+    path = DATA_DIR / "universes" / f"{name}.json"
     if not path.exists():
         return []
     return json.loads(path.read_text())
+
+
+def _load_sp500() -> list[dict]:
+    return _load_universe_json("sp500")
 
 
 def sector_map(name: str) -> dict[str, str]:
@@ -24,6 +28,8 @@ def sector_map(name: str) -> dict[str, str]:
         return dict(BROAD_UNIVERSE)
     if key == "sp500":
         return {r["symbol"]: r["sector"] for r in _load_sp500()}
+    if key in ("bist", "bist100"):
+        return {r["symbol"]: r["sector"] for r in _load_universe_json("bist100")}
     return {}
 
 # Dow 30 — same universe FinGPT-forecaster was trained on, good baseline.
