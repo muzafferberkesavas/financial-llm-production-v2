@@ -37,8 +37,10 @@ from finllm.signals.schema import (
     SignalFactors,
 )
 
-# Swing exit geometry — 2:1 reward:risk on ATR, <1-month horizon.
-ATR_STOP_MULT = 2.0
+# Swing exit geometry on ATR. Stop widened 2.0→2.5 after MFE/MAE trade forensics:
+# 2-ATR stops were whipsawed on noise (stopped, then price bounced +6.7% avg). 2.5
+# cut STOP_HIT 35%→25% and lifted PF 1.68→1.76 / WR 50%→52%, regime-robust.
+ATR_STOP_MULT = 2.5
 ATR_TARGET_MULT = 4.0
 DEFAULT_HOLDING_MIN = 3
 DEFAULT_HOLDING_MAX = 20      # ~1 trading month, matches the "<1 ay" target

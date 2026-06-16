@@ -68,9 +68,10 @@ class StrategyBacktestEngine(BacktestEngine):
         fundamental_weight: float = 0.0,
         rank_momentum_weight: float = 0.0,
         target_mult: float = 4.0,
-        stop_mult: float = 2.0,
+        stop_mult: float = 2.5,
         holding_max: int = 20,
         trail_mult: float = 0.0,
+        be_activate: float = 0.0,
         sector_map: dict[str, str] | None = None,
         market: str = "nasdaq",
     ):
@@ -81,9 +82,14 @@ class StrategyBacktestEngine(BacktestEngine):
         self.holding_max = holding_max
         # Chandelier trailing stop: once a position runs up, ratchet the stop to
         # (highest-high-since-entry − trail_mult·ATR). 0 = off (fixed stop only).
-        # The point: let momentum winners run (high PF) while locking in gains so a
-        # short-swing thesis doesn't have to choose between holding time and return.
         self.trail_mult = max(0.0, trail_mult)
+        # Profit-activated breakeven: the trail engages ONLY after peak gain reaches
+        # be_activate (e.g. 0.03 = +3%), and then never lets the stop fall below the
+        # entry price. This fixes the two biggest leaks the path analysis found:
+        # MAX_HOLDING giving back gains (+5% MFE → +1% close) and STOP whipsaw
+        # (stopped on noise, then +6.7% bounce). Unlike a from-entry chandelier
+        # (which cut winners on noise), this only arms once the trade is truly green.
+        self.be_activate = max(0.0, be_activate)
         self.use_regime = use_regime
         self.regime_long_period = regime_long_period
         # Cross-sectional 12-1m momentum blended into the slot-selection ranking
@@ -191,9 +197,17 @@ class StrategyBacktestEngine(BacktestEngine):
                 window = p.loc[(p.index >= pos.entry_date) & (p.index <= date)]
                 atr = _atr(p.loc[p.index <= date])
                 if not window.empty and atr:
-                    trail = float(window["high"].max()) - self.trail_mult * atr
-                    if eff_stop is None or trail > eff_stop:
-                        eff_stop = trail
+                    hh = float(window["high"].max())
+                    peak_gain = (hh - pos.entry_price) / pos.entry_price
+                    # If be_activate is set, arm the trail only once peak gain clears
+                    # it, and floor the stop at breakeven (entry). Otherwise trail
+                    # from entry (legacy behavior).
+                    if self.be_activate <= 0 or peak_gain >= self.be_activate:
+                        trail = hh - self.trail_mult * atr
+                        floor = pos.entry_price if self.be_activate > 0 else None
+                        cand = max(trail, floor) if floor is not None else trail
+                        if eff_stop is None or cand > eff_stop:
+                            eff_stop = cand
 
             exit_reason: ExitReason | None = None
             exit_price: float | None = None
