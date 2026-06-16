@@ -129,11 +129,14 @@ def main() -> None:
     # 7) export for the dashboard API (DATA_DIR/out/signals_nasdaq_*.json)
     if args.export:
         from finllm.api.panel_serialize import panel_to_response, write_signals_file
+        from finllm.data.commodities import fetch_commodities
         from finllm.portfolio.construction import construct_portfolio
         port = construct_portfolio(result.decisions) if result.actionable() else None
+        commodities = fetch_commodities()
         payload = panel_to_response(
             result, port, market="nasdaq",
             macro_stance=(macro.overall_stance if macro else ""), macro=macro,
+            commodities=commodities,
         )
         path = write_signals_file(payload, "nasdaq")
         console.print(f"[green]Exported[/green] {len(payload['signals'])} signals → {path}")

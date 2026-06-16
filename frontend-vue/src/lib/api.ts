@@ -1,4 +1,4 @@
-import type { SignalsResponse, PortfolioResponse, Market } from "@/types";
+import type { SignalsResponse, PortfolioResponse, CommoditiesResponse, Market } from "@/types";
 
 // In dev, Vite proxies /api → backend (vite.config.ts). In prod, set VITE_API_URL.
 const BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
@@ -19,4 +19,8 @@ export function fetchSignals(market?: Market): Promise<SignalsResponse> {
 export function fetchPortfolio(market?: Market): Promise<PortfolioResponse> {
   const q = market ? `?market=${market}` : "";
   return getJson<PortfolioResponse>(`/v2/portfolio${q}`);
+}
+
+export function fetchCommodities(): Promise<CommoditiesResponse> {
+  return getJson<CommoditiesResponse>(`/v2/commodities`);
 }

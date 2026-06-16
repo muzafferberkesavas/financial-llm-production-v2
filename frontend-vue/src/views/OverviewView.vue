@@ -4,6 +4,7 @@ import { usePanelStore } from "@/stores/panel";
 import SectorHeatStrip from "@/components/SectorHeatStrip.vue";
 import AllocationDonut from "@/components/AllocationDonut.vue";
 import ActionBadge from "@/components/ActionBadge.vue";
+import CommoditiesCard from "@/components/CommoditiesCard.vue";
 
 const panel = usePanelStore();
 const s = computed(() => panel.signals?.summary);
@@ -47,7 +48,7 @@ const topSignals = computed(() =>
     </div>
 
     <!-- Macro → sector heatmap (signature, large) -->
-    <section class="col-span-12 lg:col-span-7 card p-5">
+    <section class="col-span-12 lg:col-span-8 card p-5">
       <div class="mb-1 flex items-center justify-between">
         <h2 class="text-sm font-semibold">Makro → Sektör İştahı</h2>
         <span class="text-[11px] text-muted">0 = ayı · 0.5 = nötr · 1 = boğa</span>
@@ -56,6 +57,11 @@ const topSignals = computed(() =>
       <SectorHeatStrip v-if="macro?.sectors.length" :sectors="macro.sectors" />
       <div v-else class="py-10 text-center text-sm text-muted">Makro verisi yok</div>
     </section>
+
+    <!-- Gold & commodities -->
+    <div class="col-span-12 lg:col-span-4">
+      <CommoditiesCard />
+    </div>
 
     <!-- Allocation donut -->
     <section class="col-span-12 lg:col-span-5 card p-5">

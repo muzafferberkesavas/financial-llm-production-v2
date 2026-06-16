@@ -76,6 +76,7 @@ def panel_to_response(
     capital: float = 10_000.0,
     macro_stance: str = "",
     macro=None,
+    commodities=None,
     run_id: str | None = None,
     generated_at: str | None = None,
 ) -> dict:
@@ -125,6 +126,7 @@ def panel_to_response(
                 ) if macro else []
             ),
         },
+        "commodities": (commodities.as_dict() if commodities else None),
     }
     return {"summary": summary, "signals": signals}
 

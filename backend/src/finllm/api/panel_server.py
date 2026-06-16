@@ -41,6 +41,15 @@ def health() -> dict:
     return {"status": "ok", "signal_files": n}
 
 
+@app.get("/v2/commodities")
+@app.get("/commodities")
+def commodities() -> dict:
+    """Live gold (USD + gram-TRY), silver, USD/TRY — fetched fresh ($0, no LLM)."""
+    from finllm.data.commodities import fetch_commodities
+
+    return fetch_commodities().as_dict()
+
+
 @app.get("/signals/latest")
 @app.get("/v2/signals/latest")
 def latest(market: str | None = None) -> dict:

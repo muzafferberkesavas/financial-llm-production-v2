@@ -90,6 +90,20 @@ export interface PortfolioResponse {
   positions: PortfolioPosition[];
 }
 
+export interface Commodity {
+  key: string;
+  label: string;
+  price: number;
+  unit: string;
+  change_5d_pct?: number | null;
+  change_20d_pct?: number | null;
+}
+
+export interface CommoditiesResponse {
+  as_of: string;
+  instruments: Commodity[];
+}
+
 export const ACTION_META: Record<SignalType, { label: string; tone: "bull" | "bear" | "watch" }> = {
   GUCLU_AL: { label: "GÜÇLÜ AL", tone: "bull" },
   AL: { label: "AL", tone: "bull" },
