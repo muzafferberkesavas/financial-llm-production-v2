@@ -17,7 +17,8 @@ from finllm.utils.logging import logger
 
 _CACHE = Path("backend/data/cache/kap")
 # Disclosure categories worth surfacing as 'news' (KAP type codes via pykap).
-_NEWS_TYPES = ("KDP", "DEG", "UNV")   # özel durum, değişiklik, uyarı/diğer
+# KDP=özel durum, DEG=değişiklik, UNV=uyarı, FAR=finansal rapor, SYI=sermaye/yatırım.
+_NEWS_TYPES = ("KDP", "DEG", "UNV", "FAR", "SYI")
 
 
 @dataclass(slots=True)

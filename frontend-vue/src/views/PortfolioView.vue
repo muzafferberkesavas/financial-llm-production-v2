@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { usePanelStore } from "@/stores/panel";
 import { ACTION_META } from "@/types";
+import { money } from "@/lib/format";
 import AllocationDonut from "@/components/AllocationDonut.vue";
 
 const panel = usePanelStore();
@@ -26,7 +27,7 @@ function tone(sig: keyof typeof ACTION_META) {
     <div class="col-span-6 sm:col-span-3 card p-4"><div class="text-[11px] text-muted">Pozisyon</div><div class="num mt-1 text-2xl font-semibold">{{ p.allocated_count }}</div></div>
     <div class="col-span-6 sm:col-span-3 card p-4"><div class="text-[11px] text-muted">Yatırılan</div><div class="num mt-1 text-2xl font-semibold">{{ (100 - cashPct).toFixed(0) }}%</div></div>
     <div class="col-span-6 sm:col-span-3 card p-4"><div class="text-[11px] text-muted">Nakit</div><div class="num mt-1 text-2xl font-semibold text-muted">{{ cashPct.toFixed(0) }}%</div></div>
-    <div class="col-span-6 sm:col-span-3 card p-4"><div class="text-[11px] text-muted">Sermaye</div><div class="num mt-1 text-2xl font-semibold">${{ p.total_capital.toLocaleString() }}</div></div>
+    <div class="col-span-6 sm:col-span-3 card p-4"><div class="text-[11px] text-muted">Sermaye</div><div class="num mt-1 text-2xl font-semibold">{{ money(p.total_capital, p.market) }}</div></div>
 
     <!-- donut -->
     <section class="col-span-12 lg:col-span-4 card p-5">
@@ -65,7 +66,7 @@ function tone(sig: keyof typeof ACTION_META) {
             <td class="px-5 py-3"><span class="rounded-md px-2 py-0.5 text-xs" :class="tone(pos.signal)">{{ ACTION_META[pos.signal].label }}</span></td>
             <td class="num px-5 py-3 text-right">{{ Math.round(pos.confidence * 100) }}%</td>
             <td class="num px-5 py-3 text-right">{{ pos.allocation_weight.toFixed(1) }}%</td>
-            <td class="num px-5 py-3 text-right">${{ pos.allocation_cash.toLocaleString() }}</td>
+            <td class="num px-5 py-3 text-right">{{ money(pos.allocation_cash, p.market) }}</td>
           </tr>
           <tr v-if="!positions.length"><td colspan="6" class="px-5 py-10 text-center text-muted">Aksiyon pozisyonu yok (hepsi nakit).</td></tr>
         </tbody>

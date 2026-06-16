@@ -5,6 +5,7 @@ import SectorHeatStrip from "@/components/SectorHeatStrip.vue";
 import AllocationDonut from "@/components/AllocationDonut.vue";
 import ActionBadge from "@/components/ActionBadge.vue";
 import CommoditiesCard from "@/components/CommoditiesCard.vue";
+import { money } from "@/lib/format";
 
 const panel = usePanelStore();
 const s = computed(() => panel.signals?.summary);
@@ -71,7 +72,7 @@ const topSignals = computed(() =>
       <div v-if="port" class="mt-2 space-y-1.5">
         <div v-for="p in port.positions" :key="p.ticker" class="flex items-center justify-between text-xs">
           <span class="num font-medium">{{ p.ticker }}</span>
-          <span class="num text-muted">{{ p.allocation_weight.toFixed(1) }}% · ${{ p.allocation_cash.toLocaleString() }}</span>
+          <span class="num text-muted">{{ p.allocation_weight.toFixed(1) }}% · {{ money(p.allocation_cash, port?.market ?? 'nasdaq') }}</span>
         </div>
         <div class="flex items-center justify-between border-t border-border pt-1.5 text-xs text-muted">
           <span>Nakit</span><span class="num">{{ cashPct.toFixed(0) }}%</span>
