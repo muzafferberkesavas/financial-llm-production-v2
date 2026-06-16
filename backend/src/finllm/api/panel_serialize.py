@@ -31,11 +31,13 @@ def _rationale_block(decision) -> dict:
     }
 
 
-def _signal(decision, weight: float, capital: float, market: str, run_id: str, generated_at: str) -> dict:
+def _signal(decision, weight: float, capital: float, market: str, run_id: str, generated_at: str, rel=None) -> dict:
     c = decision.candidate
     v = decision.debate
     action = v.action if v else "IZLE"
     actionable = bool(v and action in ("AL", "GUCLU_AL") and v.position_size_pct > 0)
+    # Calibrated win probability of the technical setup (isotonic, from backtest).
+    calibrated = round(rel.calibrate(c.setup_score), 3) if (rel and rel.is_trained and c.setup_score > 0) else None
     return {
         "ticker": c.symbol,
         "market": market,
@@ -43,7 +45,7 @@ def _signal(decision, weight: float, capital: float, market: str, run_id: str, g
         "run_id": run_id,
         "signal": action,
         "confidence": round(v.confidence if v else 0.0, 3),
-        "calibrated_probability": None,
+        "calibrated_probability": calibrated,
         "entry_zone_low": None,
         "entry_zone_high": None,
         "stop_loss": None,
@@ -89,9 +91,12 @@ def panel_to_response(
     run_id = run_id or f"{market}-panel-{generated_at[:19].replace(':', '')}"
     weights = {p.symbol: p.weight_pct for p in (portfolio.positions if portfolio else [])}
 
+    from finllm.calibration.reliability import Reliability
+    rel = Reliability.load()
+
     signals = []
     for d in result.decisions:
-        sig = _signal(d, weights.get(d.candidate.symbol, 0.0), capital, market, run_id, generated_at)
+        sig = _signal(d, weights.get(d.candidate.symbol, 0.0), capital, market, run_id, generated_at, rel)
         sig["market_regime"] = macro_stance
         signals.append(sig)
 
