@@ -36,6 +36,7 @@ from finllm.backtest.strategy_signals import (
 from finllm.data.prices import fetch_prices
 from finllm.llm.macro_sector import MacroSectorAnalysis
 from finllm.markets import get_adapter
+from finllm.portfolio.models import ExitReason
 from finllm.portfolio.sector_gate import (
     SectorGateConfig,
     apply_sector_gate,
@@ -66,11 +67,23 @@ class StrategyBacktestEngine(BacktestEngine):
         fundamental_provider: Callable[[str, str], "float | None"] | None = None,
         fundamental_weight: float = 0.0,
         rank_momentum_weight: float = 0.0,
+        target_mult: float = 4.0,
+        stop_mult: float = 2.0,
+        holding_max: int = 20,
+        trail_mult: float = 0.0,
         sector_map: dict[str, str] | None = None,
         market: str = "nasdaq",
     ):
         super().__init__(config)
         self.min_setup_score = min_setup_score
+        self.target_mult = target_mult
+        self.stop_mult = stop_mult
+        self.holding_max = holding_max
+        # Chandelier trailing stop: once a position runs up, ratchet the stop to
+        # (highest-high-since-entry − trail_mult·ATR). 0 = off (fixed stop only).
+        # The point: let momentum winners run (high PF) while locking in gains so a
+        # short-swing thesis doesn't have to choose between holding time and return.
+        self.trail_mult = max(0.0, trail_mult)
         self.use_regime = use_regime
         self.regime_long_period = regime_long_period
         # Cross-sectional 12-1m momentum blended into the slot-selection ranking
@@ -157,6 +170,48 @@ class StrategyBacktestEngine(BacktestEngine):
         self._regime_cache[date] = ok
         return ok
 
+    # ---------- exits (override: add chandelier trailing stop) ----------
+
+    def _check_exits(self, date: pd.Timestamp) -> None:
+        if self.trail_mult <= 0:
+            return super()._check_exits(date)
+        from finllm.backtest.strategy_signals import _atr
+        from finllm.portfolio.exits import evaluate_exit
+
+        for sym, pos in self.ledger.as_position_models().items():
+            bar = self._today_bar(sym, date)
+            if bar is None:
+                continue
+            high, low, close = float(bar["high"]), float(bar["low"]), float(bar["close"])
+
+            # Ratchet the stop up via chandelier (never below the original stop).
+            eff_stop = pos.stop_loss
+            p = self.prices.get(sym)
+            if p is not None:
+                window = p.loc[(p.index >= pos.entry_date) & (p.index <= date)]
+                atr = _atr(p.loc[p.index <= date])
+                if not window.empty and atr:
+                    trail = float(window["high"].max()) - self.trail_mult * atr
+                    if eff_stop is None or trail > eff_stop:
+                        eff_stop = trail
+
+            exit_reason: ExitReason | None = None
+            exit_price: float | None = None
+            if eff_stop is not None and low <= eff_stop:
+                exit_reason = "STOP_HIT"
+                exit_price = eff_stop
+            elif pos.target_price is not None and high >= pos.target_price:
+                exit_reason = "TARGET_HIT"
+                exit_price = pos.target_price
+            else:
+                decision = evaluate_exit(pos, close, new_signal=None, now=date.to_pydatetime())
+                if decision.should_exit:
+                    exit_reason = decision.reason
+                    exit_price = close
+
+            if exit_reason is not None and exit_price is not None:
+                self.ledger.close_position(sym, exit_price, date.to_pydatetime(), exit_reason)
+
     # ---------- signal generation (override) ----------
 
     def _generate_signals(self, date: pd.Timestamp) -> list:
@@ -168,7 +223,9 @@ class StrategyBacktestEngine(BacktestEngine):
             if len(window) < MIN_FEATURE_ROWS:
                 continue
             sig = strategy_signal(
-                sym, window, date.to_pydatetime(), self.thresholds, self.min_setup_score
+                sym, window, date.to_pydatetime(), self.thresholds, self.min_setup_score,
+                target_mult=self.target_mult, stop_mult=self.stop_mult,
+                holding_max=self.holding_max,
             )
             if sig is not None:
                 signals.append(sig)

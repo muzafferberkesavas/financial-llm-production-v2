@@ -62,6 +62,14 @@ def main() -> None:
         default=0.0,
         help="Blend cross-sectional 12-1m momentum percentile into slot selection (0..1, 0=off)",
     )
+    ap.add_argument("--target-mult", type=float, default=4.0,
+                    help="ATR target multiple (exit geometry; lower = closer profit target)")
+    ap.add_argument("--stop-mult", type=float, default=2.0,
+                    help="ATR stop multiple (lower = tighter stop)")
+    ap.add_argument("--holding-max", type=int, default=20,
+                    help="Max holding days (swing thesis ≈ 5-8; default 20 = ~1 month)")
+    ap.add_argument("--trail-mult", type=float, default=0.0,
+                    help="Chandelier trailing-stop ATR multiple (0=off; let winners run, lock gains)")
     ap.add_argument(
         "--costs",
         choices=sorted(PRESETS),
@@ -99,6 +107,10 @@ def main() -> None:
         use_regime=not args.no_regime,
         regime_long_period=args.regime_long_period or None,
         rank_momentum_weight=args.rank_momentum,
+        target_mult=args.target_mult,
+        stop_mult=args.stop_mult,
+        holding_max=args.holding_max,
+        trail_mult=args.trail_mult,
     )
     result = engine.run()
 

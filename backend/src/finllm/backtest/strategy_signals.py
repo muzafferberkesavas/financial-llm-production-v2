@@ -130,6 +130,9 @@ def strategy_signal(
     now: datetime,
     thresholds: FilterThresholds,
     min_setup_score: float = 0.5,
+    target_mult: float = ATR_TARGET_MULT,
+    stop_mult: float = ATR_STOP_MULT,
+    holding_max: int = DEFAULT_HOLDING_MAX,
 ) -> Signal | None:
     """Emit a BUY Signal if `prices` (up to `now`) passes Stage 1 and shows a
     Stage 1B setup at or above `min_setup_score`. Otherwise None.
@@ -156,15 +159,15 @@ def strategy_signal(
     span = max(1e-9, 1.0 - min_setup_score)
     confidence = 0.60 + 0.40 * min(max((score - min_setup_score) / span, 0.0), 1.0)
 
-    stop = close - ATR_STOP_MULT * atr
-    target = close + ATR_TARGET_MULT * atr
+    stop = close - stop_mult * atr
+    target = close + target_mult * atr
     expected_return = (target - close) / close if close > 0 else None
 
     return Signal(
         symbol=symbol,
         direction="BUY",
         confidence=confidence,
-        holdingDays=HoldingDays(min=DEFAULT_HOLDING_MIN, max=DEFAULT_HOLDING_MAX),
+        holdingDays=HoldingDays(min=DEFAULT_HOLDING_MIN, max=holding_max),
         entryPrice=close,
         targetPrice=target,
         stopLoss=stop,
