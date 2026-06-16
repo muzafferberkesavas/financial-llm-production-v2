@@ -65,6 +65,7 @@ class StrategyBacktestEngine(BacktestEngine):
         macro_provider: MacroProvider | None = None,
         fundamental_provider: Callable[[str, str], "float | None"] | None = None,
         fundamental_weight: float = 0.0,
+        rank_momentum_weight: float = 0.0,
         sector_map: dict[str, str] | None = None,
         market: str = "nasdaq",
     ):
@@ -72,6 +73,12 @@ class StrategyBacktestEngine(BacktestEngine):
         self.min_setup_score = min_setup_score
         self.use_regime = use_regime
         self.regime_long_period = regime_long_period
+        # Cross-sectional 12-1m momentum blended into the slot-selection ranking
+        # (signal research #4 — a replicated factor). 0 = setup-only baseline. The
+        # point: across a 500-name universe, setup score alone picks the wrong 7;
+        # a proven cross-sectional factor should improve which names win the slots.
+        self.rank_momentum_weight = max(0.0, min(1.0, rank_momentum_weight))
+        self._mom_cache: dict[str, pd.Series] = {}
         self.market = market
         self.thresholds = get_adapter(market).thresholds
         self.regime_symbol = REGIME_BY_MARKET.get(market, REGIME_SYMBOL)
@@ -195,6 +202,8 @@ class StrategyBacktestEngine(BacktestEngine):
                 return (1.0 - fw) * setup + fw * comp_norm
 
             fresh.sort(key=_combined, reverse=True)
+        elif self.rank_momentum_weight > 0:
+            fresh.sort(key=self._setup_momentum_key(fresh, date), reverse=True)
         else:
             fresh.sort(key=lambda s: s.signals.technical.score, reverse=True)
         fresh = fresh[:open_slots]
@@ -224,6 +233,50 @@ class StrategyBacktestEngine(BacktestEngine):
                 cap = target_capital * (g.adjusted_confidence / signal.confidence)
             plans.append((signal, cap))
         return plans
+
+    def _mom_series(self, sym: str) -> pd.Series | None:
+        """12-1m momentum for EVERY bar of a symbol, computed once (vectorized) and
+        cached. mom[t] = close[t-SKIP] / close[t-(LOOKBACK-1)] - 1, matching
+        indicators.momentum.momentum_12_1 (end = skip last month, start ≈ 12m ago).
+        Causal: shift() only looks backward, so a date's value uses no future bar."""
+        s = self._mom_cache.get(sym)
+        if s is None:
+            from finllm.indicators.momentum import LOOKBACK, SKIP
+
+            p = self.prices.get(sym)
+            if p is None:
+                return None
+            c = p["close"]
+            s = c.shift(SKIP) / c.shift(LOOKBACK - 1) - 1.0
+            self._mom_cache[sym] = s
+        return s
+
+    def _setup_momentum_key(self, fresh: list, date: pd.Timestamp):
+        """Rank key = (1-w)·setup + w·(cross-sectional 12-1m momentum percentile).
+
+        Momentum is ranked as a PERCENTILE *within today's candidate set* (not an
+        absolute threshold) so it adds the factor without overfitting a magnitude —
+        exactly the disciplined-factor construction the research calls for.
+        """
+        w = self.rank_momentum_weight
+        moms: dict[str, float | None] = {}
+        for s in fresh:
+            ser = self._mom_series(s.symbol)
+            val = None
+            if ser is not None:
+                hits = ser.loc[ser.index <= date]
+                if not hits.empty:
+                    v = hits.iloc[-1]
+                    val = float(v) if pd.notna(v) else None
+            moms[s.symbol] = val
+        valid = sorted(v for v in moms.values() if v is not None)
+
+        def _pct(x: float | None) -> float:
+            if x is None or not valid:
+                return 0.5
+            return sum(1 for v in valid if v <= x) / len(valid)
+
+        return lambda s: (1.0 - w) * s.signals.technical.score + w * _pct(moms[s.symbol])
 
     # ---------- macro view (monthly-cached) ----------
 

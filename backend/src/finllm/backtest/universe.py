@@ -1,6 +1,31 @@
 """Symbol universes for backtesting."""
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+
+from finllm.config.settings import DATA_DIR
+
+
+@lru_cache(maxsize=1)
+def _load_sp500() -> list[dict]:
+    """The production-scale S&P 500 universe (scripts/fetch_sp500_universe.py).
+    Empty list if not fetched yet — caller falls back to a named universe."""
+    path = DATA_DIR / "universes" / "sp500.json"
+    if not path.exists():
+        return []
+    return json.loads(path.read_text())
+
+
+def sector_map(name: str) -> dict[str, str]:
+    """symbol → sector for a named universe (macro→sector overlay in the backtest)."""
+    key = name.lower().strip()
+    if key == "broad":
+        return dict(BROAD_UNIVERSE)
+    if key == "sp500":
+        return {r["symbol"]: r["sector"] for r in _load_sp500()}
+    return {}
+
 # Dow 30 — same universe FinGPT-forecaster was trained on, good baseline.
 DOW30 = [
     "AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
@@ -83,6 +108,11 @@ def resolve(name_or_list: str) -> list[str]:
     key = name_or_list.lower().strip()
     if key == "broad":
         return list(BROAD_UNIVERSE.keys())
+    if key == "sp500":
+        syms = [r["symbol"] for r in _load_sp500()]
+        if not syms:
+            raise ValueError("sp500 universe not fetched — run scripts/fetch_sp500_universe.py")
+        return syms
     if key in ("bist", "bist100"):
         from finllm.markets.universes.bist_100 import BIST_100_TICKERS
         return [f"{t.symbol}.IS" for t in BIST_100_TICKERS]

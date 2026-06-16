@@ -18,6 +18,9 @@ def _cache_path(symbol: str, interval: str) -> Path:
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def _download(symbol: str, start: str, end: str | None, interval: str) -> pd.DataFrame:
+    # timeout caps yfinance's own socket wait so a single hung symbol can't stall a
+    # 500-name backtest indefinitely — it fails fast, retries, then skips. Without
+    # it one flaky name blocks the whole universe load (observed: 30-min hangs).
     df = yf.download(
         symbol,
         start=start,
@@ -26,6 +29,7 @@ def _download(symbol: str, start: str, end: str | None, interval: str) -> pd.Dat
         progress=False,
         auto_adjust=True,
         actions=False,
+        timeout=20,
     )
     if df.empty:
         raise ValueError(f"No data returned for {symbol}")
