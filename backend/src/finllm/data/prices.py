@@ -60,15 +60,29 @@ def fetch_prices(
             return cached.loc[start:end]
 
         pieces = [cached]
+        updated = False
+        # A failed incremental fetch (e.g. today's bar before market close, or a
+        # transient yfinance error) must NOT discard a perfectly good cache. Degrade
+        # gracefully: skip the missing slice and serve what we have. Without this,
+        # a 1-day forward miss zeroed out the whole live panel (setup score 0).
         if needs_backfill:
             logger.info(f"{symbol}: cache backfill {start} → {first_date}")
-            pieces.insert(0, _download(symbol, start, first_date, interval))
+            try:
+                pieces.insert(0, _download(symbol, start, first_date, interval))
+                updated = True
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"{symbol}: backfill failed ({e}) — using cache from {first_date}")
         if needs_forward:
             logger.info(f"{symbol}: cache forward {last_date} → {end}")
-            pieces.append(_download(symbol, last_date, end, interval))
-        merged = pd.concat(pieces)
+            try:
+                pieces.append(_download(symbol, last_date, end, interval))
+                updated = True
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"{symbol}: forward failed ({e}) — using cache through {last_date}")
+        merged = pd.concat(pieces) if len(pieces) > 1 else cached
         merged = merged[~merged.index.duplicated(keep="last")].sort_index()
-        merged.to_parquet(cache_file)
+        if updated:
+            merged.to_parquet(cache_file)
         return merged.loc[start:end]
 
     logger.info(f"{symbol}: full download {start} → {end}")
