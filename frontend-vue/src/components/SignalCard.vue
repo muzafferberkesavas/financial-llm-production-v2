@@ -2,66 +2,61 @@
 import { computed } from "vue";
 import type { ExtendedSignal } from "@/types";
 import { ACTION_META } from "@/types";
+import GaugeRing from "./GaugeRing.vue";
+import ActionBadge from "./ActionBadge.vue";
 
 const props = defineProps<{ signal: ExtendedSignal }>();
+const emit = defineEmits<{ open: [ExtendedSignal] }>();
 
-const meta = computed(() => ACTION_META[props.signal.signal]);
-const toneClass = computed(() => ({
-  bull: "bg-bull/15 text-bull border-bull/30",
-  bear: "bg-bear/15 text-bear border-bear/30",
-  watch: "bg-watch/15 text-watch border-watch/30",
-}[meta.value.tone]));
-const confPct = computed(() => Math.round(props.signal.confidence * 100));
+const tone = computed(() => ACTION_META[props.signal.signal].tone);
+const gaugeColor = computed(() => ({ bull: "#34d399", bear: "#f43f5e", watch: "#f0b454" }[tone.value]));
 </script>
 
 <template>
-  <article class="rounded-2xl border border-border bg-surface p-4 transition hover:border-accent/40">
-    <header class="flex items-start justify-between">
-      <div>
+  <article
+    class="card group cursor-pointer p-4 transition hover:border-border-2 hover:bg-surface-2"
+    @click="emit('open', signal)"
+  >
+    <header class="flex items-start justify-between gap-3">
+      <div class="min-w-0">
         <div class="flex items-center gap-2">
-          <h3 class="text-lg font-semibold tracking-tight">{{ signal.ticker }}</h3>
-          <span v-if="signal.sector" class="text-[11px] text-muted">{{ signal.sector }}</span>
+          <h3 class="num text-lg font-semibold tracking-tight">{{ signal.ticker }}</h3>
+          <span v-if="signal.sector" class="truncate text-[11px] text-muted">{{ signal.sector }}</span>
         </div>
-        <div class="mt-0.5 text-[11px] text-muted">
-          öncelik {{ signal.confluence_score.toFixed(0) }} · {{ signal.market_regime || '—' }}
+        <div class="mt-0.5 flex items-center gap-2 text-[11px] text-faint">
+          <span>öncelik <span class="num text-muted">{{ signal.confluence_score.toFixed(0) }}</span></span>
+          <span v-if="signal.market_regime" class="capitalize">· {{ signal.market_regime }}</span>
         </div>
       </div>
-      <span class="rounded-lg border px-2.5 py-1 text-xs font-semibold" :class="toneClass">
-        {{ meta.label }}
-      </span>
+      <GaugeRing :value="signal.confidence" :color="gaugeColor" :size="60" />
     </header>
 
-    <!-- confidence + allocation -->
-    <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
-      <div>
-        <div class="mb-1 flex justify-between text-muted"><span>Güven</span><span>{{ confPct }}%</span></div>
-        <div class="h-1.5 overflow-hidden rounded-full bg-surface-2">
-          <div class="h-full rounded-full bg-accent" :style="{ width: confPct + '%' }" />
+    <div class="mt-1 flex items-center justify-between">
+      <ActionBadge :action="signal.signal" />
+      <div class="text-right text-xs">
+        <div class="num font-medium" :class="signal.allocation_weight > 0 ? 'text-text' : 'text-faint'">
+          {{ signal.allocation_weight > 0 ? signal.allocation_weight.toFixed(1) + '%' : '—' }}
         </div>
-      </div>
-      <div>
-        <div class="mb-1 flex justify-between text-muted"><span>Tahsis</span><span>{{ signal.allocation_weight.toFixed(1) }}%</span></div>
-        <div class="text-white/90">${{ signal.allocation_cash.toLocaleString() }}
-          <span v-if="signal.time_horizon_days" class="text-muted">· {{ signal.time_horizon_days }}g</span>
-        </div>
+        <div class="text-[10px] text-muted">tahsis</div>
       </div>
     </div>
 
-    <!-- bull / bear -->
-    <div v-if="signal.rationale.trend || signal.rationale.news" class="mt-3 space-y-1.5 text-xs">
-      <p v-if="signal.rationale.trend" class="text-bull/90"><span class="font-semibold">▲</span> {{ signal.rationale.trend }}</p>
-      <p v-if="signal.rationale.news" class="text-bear/90"><span class="font-semibold">▼</span> {{ signal.rationale.news }}</p>
+    <!-- bull / bear thesis -->
+    <div class="mt-3 space-y-1.5 border-t border-border pt-3 text-xs">
+      <p v-if="signal.rationale.trend" class="line-clamp-2 text-bull/90">
+        <span class="font-semibold">▲</span> {{ signal.rationale.trend }}
+      </p>
+      <p v-if="signal.rationale.news" class="line-clamp-2 text-bear/90">
+        <span class="font-semibold">▼</span> {{ signal.rationale.news }}
+      </p>
     </div>
 
-    <p v-if="signal.rationale.full" class="mt-3 text-xs leading-relaxed text-muted">
-      {{ signal.rationale.full }}
-    </p>
-
-    <footer class="mt-3 flex items-center justify-between border-t border-border pt-2 text-[11px] text-muted">
-      <span :class="signal.backtest_gate_passed ? 'text-bull' : 'text-bear'">
-        {{ signal.backtest_gate_passed ? '✓ gate' : '✗ gate' }}
+    <footer class="mt-3 flex items-center justify-between text-[10px] text-faint">
+      <span class="inline-flex items-center gap-1" :class="signal.backtest_gate_passed ? 'text-bull/80' : 'text-bear/80'">
+        <span class="h-1 w-1 rounded-full" :class="signal.backtest_gate_passed ? 'bg-bull' : 'bg-bear'" />
+        gate {{ signal.backtest_gate_passed ? 'geçti' : 'kaldı' }}
       </span>
-      <span>{{ signal.llm_model.replace('claude-', '') }} · ${{ signal.llm_cost_usd.toFixed(4) }}</span>
+      <span class="num">{{ signal.llm_model.replace('claude-', '') }} · ${{ signal.llm_cost_usd.toFixed(4) }}</span>
     </footer>
   </article>
 </template>

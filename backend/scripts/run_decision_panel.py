@@ -133,7 +133,7 @@ def main() -> None:
         port = construct_portfolio(result.decisions) if result.actionable() else None
         payload = panel_to_response(
             result, port, market="nasdaq",
-            macro_stance=(macro.overall_stance if macro else ""),
+            macro_stance=(macro.overall_stance if macro else ""), macro=macro,
         )
         path = write_signals_file(payload, "nasdaq")
         console.print(f"[green]Exported[/green] {len(payload['signals'])} signals → {path}")

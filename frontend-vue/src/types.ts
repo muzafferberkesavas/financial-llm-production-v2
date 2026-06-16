@@ -47,6 +47,19 @@ export interface RunSummary {
   actionable_signals: number;
   total_cost_usd: number;
   regime?: { fear_level?: string; trade_enabled?: boolean };
+  macro?: MacroBlock;
+}
+
+export interface SectorAppetite {
+  sector: string;
+  appetite: number;     // 0..1, 0.5 neutral
+  rationale?: string;
+}
+
+export interface MacroBlock {
+  stance: string;       // risk_on | neutral | risk_off
+  summary: string;
+  sectors: SectorAppetite[];
 }
 
 export interface SignalsResponse {

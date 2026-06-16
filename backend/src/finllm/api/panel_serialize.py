@@ -75,10 +75,15 @@ def panel_to_response(
     market: str = "nasdaq",
     capital: float = 10_000.0,
     macro_stance: str = "",
+    macro=None,
     run_id: str | None = None,
     generated_at: str | None = None,
 ) -> dict:
-    """Build the {summary, signals} payload the dashboard expects."""
+    """Build the {summary, signals} payload the dashboard expects.
+
+    `macro` (MacroSectorAnalysis) adds the sector-appetite heatmap data to the
+    summary so the UI can render the macro→sector view.
+    """
     generated_at = generated_at or datetime.utcnow().isoformat()
     run_id = run_id or f"{market}-panel-{generated_at[:19].replace(':', '')}"
     weights = {p.symbol: p.weight_pct for p in (portfolio.positions if portfolio else [])}
@@ -109,6 +114,17 @@ def panel_to_response(
         "stage_durations_sec": {},
         "total_duration_sec": 0.0,
         "total_cost_usd": round(result.total_cost_usd, 4),
+        "macro": {
+            "stance": (macro.overall_stance if macro else macro_stance),
+            "summary": (macro.macro_summary if macro else ""),
+            "sectors": (
+                sorted(
+                    [{"sector": s.sector, "appetite": round(s.appetite, 3), "rationale": s.rationale}
+                     for s in macro.sectors],
+                    key=lambda x: x["appetite"], reverse=True,
+                ) if macro else []
+            ),
+        },
     }
     return {"summary": summary, "signals": signals}
 

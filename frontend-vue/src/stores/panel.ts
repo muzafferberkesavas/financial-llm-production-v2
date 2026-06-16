@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { fetchSignals, fetchPortfolio } from "@/lib/api";
-import type { SignalsResponse, PortfolioResponse, Market } from "@/types";
+import type { SignalsResponse, PortfolioResponse, Market, ExtendedSignal, MacroBlock } from "@/types";
 
 export const usePanelStore = defineStore("panel", () => {
   const market = ref<Market>("nasdaq");
@@ -9,6 +9,11 @@ export const usePanelStore = defineStore("panel", () => {
   const portfolio = ref<PortfolioResponse | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const selected = ref<ExtendedSignal | null>(null);
+
+  const macro = computed<MacroBlock | null>(() => signals.value?.summary.macro ?? null);
+  const list = computed<ExtendedSignal[]>(() => signals.value?.signals ?? []);
+  const actionable = computed(() => list.value.filter((s) => s.is_actionable));
 
   async function load() {
     loading.value = true;
@@ -35,5 +40,8 @@ export const usePanelStore = defineStore("panel", () => {
     void load();
   }
 
-  return { market, signals, portfolio, loading, error, load, setMarket };
+  return {
+    market, signals, portfolio, loading, error, selected,
+    macro, list, actionable, load, setMarket,
+  };
 });
