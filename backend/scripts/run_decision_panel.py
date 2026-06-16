@@ -87,7 +87,7 @@ def main() -> None:
         from finllm.data.macro import build_macro_context
         from finllm.llm.macro_sector import MacroSectorClient
         console.print("[dim]Macro→sector (Sonnet, ~$0.02)…[/dim]")
-        macro = MacroSectorClient().analyze(build_macro_context(with_news=True, news_limit=10))
+        macro = MacroSectorClient().analyze(build_macro_context(market=market, with_news=True, news_limit=10))
         console.print(f"  stance: [yellow]{macro.overall_stance}[/yellow]")
 
     # 3) run the panel

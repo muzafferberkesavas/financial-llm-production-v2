@@ -89,7 +89,14 @@ def build_macro_context(
     `as_of` (YYYY-MM-DD) makes the whole block point-in-time for historical
     backtests — prices are sliced to that date, FRED queried as-of, and live RSS
     news (which has no history) is skipped automatically.
+
+    For `market="bist"` the context is built from TURKISH drivers (TCMB policy
+    rate / CPI / USD-TRY + BIST index regime), not the Fed — the right drivers for
+    BIST's domestic sectors.
     """
+    if market == "bist":
+        return _build_bist_context(news_limit, with_news, as_of)
+
     frames = {name: _series(name, tk, as_of) for name, tk in MACRO_TICKERS.items()}
 
     regime, rates_yf, commodities, usd = [], [], [], []
@@ -132,6 +139,34 @@ def build_macro_context(
 
     stamp = as_of or datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     return f"[AS OF] {stamp}\n\n" + "\n\n".join(blocks)
+
+
+def _build_bist_context(news_limit: int, with_news: bool, as_of: str | None) -> str:
+    """BIST macro context — Turkish drivers (TCMB + XU100/USD-TRY + gold + news)."""
+    blocks: list[str] = []
+
+    from finllm.data.tcmb import tcmb_macro_block
+
+    tcmb = tcmb_macro_block() if as_of is None else None  # EVDS as-of not wired yet
+    blocks.append(tcmb if tcmb else "[TÜRK MAKRO] (TCMB anahtarı/verisi yok — thin)")
+
+    regime = []
+    for name, tk in (("BIST XU100", "XU100.IS"), ("USD/TRY", "USDTRY=X")):
+        df = _series(name, tk, as_of)
+        if df is not None:
+            regime.append(_describe(name, df))
+    blocks.append("[PİYASA REJİMİ]\n" + ("\n".join(regime) if regime else "n/a"))
+
+    gold = _series("Gold", "GC=F", as_of)
+    if gold is not None:
+        blocks.append("[EMTİA]\n" + _describe("Altın (USD/ons)", gold))
+
+    if with_news and as_of is None:
+        heads = _headlines("bist", news_limit)
+        blocks.append("[HABERLER] (son 48s)\n" + ("\n".join(heads) if heads else "n/a"))
+
+    stamp = as_of or datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    return f"[AS OF] {stamp} · BIST\n\n" + "\n\n".join(blocks)
 
 
 __all__ = ["build_macro_context", "MACRO_TICKERS"]
