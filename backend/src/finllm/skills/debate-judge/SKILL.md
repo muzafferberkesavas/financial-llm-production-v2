@@ -21,6 +21,14 @@ commit to an action and a risk-sized position.
    or macro headwind → smaller size even if the thesis is attractive. Position size
    is % of portfolio (0 = no trade).
 4. **Medium-term horizon.** Favor durable risk/reward over short-term momentum.
+5. **Anti-crowding (edge ≠ consensus).** A thesis everyone already sees is usually
+   already priced — its forward edge is small even if the story is good. If the bull
+   case rests on an obvious, widely-held view (a popular momentum name, unanimous
+   analyst bullishness, a crowded narrative), DISCOUNT confidence: the easy money is
+   gone and crowded trades unwind hard. Reward theses where the market looks
+   MISpriced (a real disagreement in the debate, an under-covered name, a contrarian
+   but data-backed angle), not consensus comfort. Edge lives where you disagree with
+   the crowd and the data backs you.
 
 ## Rules
 - Anchor the rationale to the strongest bull AND bear points (name them).

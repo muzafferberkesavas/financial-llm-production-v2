@@ -115,11 +115,20 @@ def build_debate_block(
         lines.append("[FUNDAMENTALS] n/a")
 
     if finnhub is not None:
+        from finllm.indicators.pead import pead_label, pead_score
+
+        pl = pead_label(pead_score(finnhub))
+        pead_txt = f" | PEAD {pl}" if pl != "none" else ""
         lines.append(
             f"[EARNINGS/ANALYST] earnings {finnhub.earnings_momentum} "
             f"(streak {finnhub.beat_streak}Q, avg surprise {_fmt(finnhub.avg_surprise_pct, suffix='%')}) | "
-            f"analyst {finnhub.analyst_label} ({_fmt(finnhub.analyst_score)}, n={finnhub.n_analysts})"
+            f"analyst {finnhub.analyst_label} ({_fmt(finnhub.analyst_score)}, n={finnhub.n_analysts}){pead_txt}"
         )
+
+    # Earnings-event gate: a binary event before a medium-term entry is real risk.
+    dte = getattr(snap, "days_to_earnings", None) if snap is not None else None
+    if dte is not None and 0 <= dte <= 7:
+        lines.append(f"[EVENT] earnings in {dte} days — binary event risk before entry")
 
     if news:
         lines.append("[NEWS/KAP]")
