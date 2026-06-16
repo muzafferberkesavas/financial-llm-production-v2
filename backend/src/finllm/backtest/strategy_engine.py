@@ -67,6 +67,8 @@ class StrategyBacktestEngine(BacktestEngine):
         fundamental_provider: Callable[[str, str], "float | None"] | None = None,
         fundamental_weight: float = 0.0,
         rank_momentum_weight: float = 0.0,
+        mom_lookback: int = 252,
+        mom_skip: int = 21,
         target_mult: float = 4.0,
         stop_mult: float = 2.5,
         holding_max: int = 20,
@@ -97,6 +99,12 @@ class StrategyBacktestEngine(BacktestEngine):
         # point: across a 500-name universe, setup score alone picks the wrong 7;
         # a proven cross-sectional factor should improve which names win the slots.
         self.rank_momentum_weight = max(0.0, min(1.0, rank_momentum_weight))
+        # Lookback/skip for the selection-momentum. Default 252/21 = 12-1m, but trade
+        # forensics showed 12-1m barely separates winners from losers (Cohen's d 0.09)
+        # while SHORT momentum (~20d) does (d 0.53). Tunable so we can rank on the
+        # signal that actually discriminates.
+        self.mom_lookback = mom_lookback
+        self.mom_skip = mom_skip
         self._mom_cache: dict[str, pd.Series] = {}
         self.market = market
         self.thresholds = get_adapter(market).thresholds
@@ -312,13 +320,12 @@ class StrategyBacktestEngine(BacktestEngine):
         Causal: shift() only looks backward, so a date's value uses no future bar."""
         s = self._mom_cache.get(sym)
         if s is None:
-            from finllm.indicators.momentum import LOOKBACK, SKIP
-
             p = self.prices.get(sym)
             if p is None:
                 return None
             c = p["close"]
-            s = c.shift(SKIP) / c.shift(LOOKBACK - 1) - 1.0
+            # mom[t] = close[t-skip] / close[t-(lookback-1)] - 1
+            s = c.shift(self.mom_skip) / c.shift(max(1, self.mom_lookback - 1)) - 1.0
             self._mom_cache[sym] = s
         return s
 

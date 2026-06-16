@@ -62,6 +62,10 @@ def main() -> None:
         default=0.0,
         help="Blend cross-sectional 12-1m momentum percentile into slot selection (0..1, 0=off)",
     )
+    ap.add_argument("--mom-lookback", type=int, default=252,
+                    help="Selection-momentum lookback in bars (252=12mo; 20=short, more discriminative)")
+    ap.add_argument("--mom-skip", type=int, default=21,
+                    help="Selection-momentum skip in bars (21=skip last month; 0=no skip)")
     ap.add_argument("--target-mult", type=float, default=4.0,
                     help="ATR target multiple (exit geometry; lower = closer profit target)")
     ap.add_argument("--stop-mult", type=float, default=2.5,
@@ -109,6 +113,8 @@ def main() -> None:
         use_regime=not args.no_regime,
         regime_long_period=args.regime_long_period or None,
         rank_momentum_weight=args.rank_momentum,
+        mom_lookback=args.mom_lookback,
+        mom_skip=args.mom_skip,
         target_mult=args.target_mult,
         stop_mult=args.stop_mult,
         holding_max=args.holding_max,
