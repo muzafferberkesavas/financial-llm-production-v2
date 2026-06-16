@@ -61,4 +61,20 @@ def relative_composites(snaps: dict[str, FundamentalSnapshot]) -> dict[str, dict
     return out
 
 
-__all__ = ["relative_composites"]
+def to_risk_reward(rel: dict):
+    """Convert one relative_composites entry → a RiskRewardScore (for the panel)."""
+    from finllm.indicators.risk_reward import RiskRewardScore
+
+    quality = rel["quality"]
+    flag = "strong" if quality >= 66 else "ok" if quality >= 33 else "weak"
+    reward = 0.4 * rel["value"] + 0.3 * rel["growth"] + 0.3 * rel["quality"]
+    return RiskRewardScore(
+        reward=round(reward, 1),
+        risk=round(100 - rel["risk_safety"], 1),
+        quality_flag=flag,
+        composite=rel["composite"],
+        notes=["BIST-relative (percentile) scoring"],
+    )
+
+
+__all__ = ["relative_composites", "to_risk_reward"]

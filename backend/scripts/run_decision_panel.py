@@ -81,6 +81,24 @@ def main() -> None:
         fh = fetch_finnhub_signals(sym) if market == "nasdaq" else None  # Finnhub US-only
         inputs.append(CandidateInput(symbol=sym, setup_score=setup or 0.0, snap=snap, finnhub=fh))
 
+    # BIST enrichment: relative (percentile) scoring instead of US benchmarks +
+    # KAP/Turkish news for the debate.
+    if market == "bist":
+        from finllm.data.kap import fetch_kap
+        from finllm.data.news.bist_stock_news import fetch_bist_stock_news
+        from finllm.data.news.rss_reader import RssReader
+        from finllm.indicators.relative_score import relative_composites, to_risk_reward
+        console.print("[dim]BIST: göreli skorlama + KAP/haber…[/dim]")
+        snaps = {i.symbol: i.snap for i in inputs if i.snap is not None}
+        rel = relative_composites(snaps) if snaps else {}
+        feed = RssReader(market="bist").fetch(max_age_hours=120, limit=120)
+        for i in inputs:
+            if i.symbol in rel:
+                i.rr = to_risk_reward(rel[i.symbol])
+            rss = [n.title for n in fetch_bist_stock_news(i.symbol, _feed=feed)]
+            kap = fetch_kap(i.symbol).disclosures
+            i.news = (rss + kap)[:6]
+
     # 2) macro view (1 call) unless disabled
     macro = None
     if not args.no_macro:

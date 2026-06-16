@@ -31,6 +31,8 @@ class CandidateInput:
     setup_score: float
     snap: FundamentalSnapshot | None = None
     finnhub: FinnhubSignals | None = None
+    rr: object = None    # precomputed RiskRewardScore (e.g. BIST-relative); overrides
+    news: list = field(default_factory=list)  # extra context (KAP/Turkish news)
 
 
 @dataclass(slots=True)
@@ -76,7 +78,7 @@ def run_decision_panel(
         appetite = _appetite(macro, sector)
         cs = score_candidate(
             inp.symbol, inp.setup_score, inp.snap,
-            finnhub=inp.finnhub, sector_appetite=appetite,
+            finnhub=inp.finnhub, sector_appetite=appetite, rr=inp.rr,
         )
         scored.append((cs, inp))
 
@@ -93,7 +95,7 @@ def run_decision_panel(
         inp = by_symbol[cs.symbol]
         block = build_debate_block(
             cs.symbol, cs.setup_score, inp.snap,
-            finnhub=inp.finnhub, sector_appetite=cs.macro_appetite,
+            finnhub=inp.finnhub, sector_appetite=cs.macro_appetite, news=inp.news,
         )
         d = debate_client.debate(cs.symbol, block)
         result.total_cost_usd += d.cost_usd

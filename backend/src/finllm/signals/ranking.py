@@ -93,6 +93,7 @@ def build_debate_block(
     finnhub: FinnhubSignals | None = None,
     sector_appetite: float = 0.5,
     rr: RiskRewardScore | None = None,
+    news: list[str] | None = None,
 ) -> str:
     """Assemble the per-stock DATA BLOCK fed to the Faz C debate — all signals in
     one text view so bull/bear arguments can anchor to specific figures."""
@@ -120,6 +121,9 @@ def build_debate_block(
             f"analyst {finnhub.analyst_label} ({_fmt(finnhub.analyst_score)}, n={finnhub.n_analysts})"
         )
 
+    if news:
+        lines.append("[NEWS/KAP]")
+        lines += [f"  - {n}" for n in news[:6]]
     lines.append(f"[MACRO] sector appetite {sector_appetite:.2f} (0.5 neutral; >0.5 tailwind)")
     lines.append(
         f"[RISK/REWARD] reward {rr.reward:.0f} | risk {rr.risk:.0f} | quality {rr.quality_flag} | "
