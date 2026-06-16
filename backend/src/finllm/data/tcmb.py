@@ -13,13 +13,16 @@ key is available; each is fetched independently and degrades to None on failure.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 import httpx
 
 from finllm.config.settings import settings
 from finllm.utils.logging import logger
 
-_BASE = "https://evds3.tcmb.gov.tr/service/evds"
+# EVDS REST (2026 evds3 migration): API moved to /igmevdsms-dis; params are
+# urlencoded onto the PATH (no '?'), key in the header.
+_BASE = "https://evds3.tcmb.gov.tr/igmevdsms-dis"
 
 # EVDS series codes (frequency in comment). Adjust if EVDS renames them.
 SERIES = {
@@ -46,7 +49,9 @@ def _fetch(series: str, months: int = 18) -> list[tuple[str, float]]:
         "type": "json",
     }
     try:
-        r = httpx.get(_BASE, params=params, headers={"key": key}, timeout=20, follow_redirects=True)
+        # params urlencoded onto the path (EVDS REST convention), NOT as ?query.
+        url = f"{_BASE}/{urlencode(params)}"
+        r = httpx.get(url, headers={"key": key}, timeout=20, follow_redirects=True)
         r.raise_for_status()
         col = series.replace(".", "_")
         out = []
