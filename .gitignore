@@ -41,3 +41,4 @@ Thumbs.db
 .vscode/
 backend/data/macro_cache.json
 backend/data/cache/finnhub/
+backend/data/cache/kap/
