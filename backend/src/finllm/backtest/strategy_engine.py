@@ -79,6 +79,8 @@ class StrategyBacktestEngine(BacktestEngine):
         sizing_mode: str = "equal",   # equal | conviction | inverse_atr
         risk_pct: float = 0.02,       # per-trade equity risk for inverse_atr
         max_pos_pct: float = 0.35,    # cap any single position at this fraction
+        vol_target: float = 0.0,      # annualized target vol for exposure scaling (0=off)
+        vol_lookback: int = 20,       # bars of realized vol to estimate the regime
         sector_map: dict[str, str] | None = None,
         market: str = "nasdaq",
     ):
@@ -92,6 +94,11 @@ class StrategyBacktestEngine(BacktestEngine):
         self.sizing_mode = sizing_mode
         self.risk_pct = risk_pct
         self.max_pos_pct = max_pos_pct
+        # Portfolio inverse-vol scaling (Barroso & Santa-Clara): when the market's
+        # realized vol spikes above target, cut total exposure (hold cash); when calm,
+        # deploy fully. Lifts Sharpe and cuts crashes without touching stock selection.
+        self.vol_target = vol_target
+        self.vol_lookback = vol_lookback
         # Chandelier trailing stop: once a position runs up, ratchet the stop to
         # (highest-high-since-entry − trail_mult·ATR). 0 = off (fixed stop only).
         self.trail_mult = max(0.0, trail_mult)
@@ -193,6 +200,20 @@ class StrategyBacktestEngine(BacktestEngine):
         )
         self._regime_cache[date] = ok
         return ok
+
+    def _vol_scalar(self, date: pd.Timestamp) -> float:
+        """Exposure multiplier in [0,1] = target_vol / market_realized_vol, capped at 1
+        (no leverage). High realized vol → smaller positions / more cash."""
+        if self.vol_target <= 0 or self.regime_prices is None:
+            return 1.0
+        window = self.regime_prices.loc[self.regime_prices.index <= date]
+        if len(window) < self.vol_lookback + 1:
+            return 1.0
+        rets = window["close"].pct_change().dropna().iloc[-self.vol_lookback:]
+        realized = float(rets.std() * (252 ** 0.5))
+        if realized <= 0:
+            return 1.0
+        return max(0.0, min(1.0, self.vol_target / realized))
 
     # ---------- exits (override: add chandelier trailing stop) ----------
 
@@ -304,17 +325,18 @@ class StrategyBacktestEngine(BacktestEngine):
             {s: p for s, p in prices_today.items() if p is not None}
         )
         cap_ceiling = total_value * self.max_pos_pct
+        vol_scalar = self._vol_scalar(date)  # ≤1: shrink exposure in high-vol regimes
 
         def _slug(signal) -> float:
             """Capital for one position under the active sizing mode (capped)."""
-            equal = total_value / self.max_positions
+            equal = total_value / self.max_positions * vol_scalar
             if self.sizing_mode == "inverse_atr":
                 # Equal-RISK: each trade risks risk_pct of equity at its stop. A
                 # tight-ATR name gets more capital, a wide-ATR name less.
                 entry, stop = signal.entryPrice, signal.stopLoss
                 if entry and stop and entry > stop:
                     stop_frac = (entry - stop) / entry
-                    return min(cap_ceiling, total_value * self.risk_pct / stop_frac)
+                    return min(cap_ceiling, total_value * self.risk_pct * vol_scalar / stop_frac)
                 return min(cap_ceiling, equal)
             if self.sizing_mode == "conviction":
                 # Tilt toward higher-momentum names: 0.6×–1.6× the equal slug by the

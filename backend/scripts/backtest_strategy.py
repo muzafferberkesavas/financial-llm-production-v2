@@ -84,6 +84,9 @@ def main() -> None:
                     help="Position sizing: equal-weight / momentum-conviction-tilted / equal-risk")
     ap.add_argument("--risk-pct", type=float, default=0.02, help="Per-trade equity risk for inverse_atr")
     ap.add_argument("--max-pos-pct", type=float, default=0.35, help="Cap any single position at this fraction")
+    ap.add_argument("--vol-target", type=float, default=0.0,
+                    help="Annualized target vol for inverse-vol exposure scaling (e.g. 0.20; 0=off)")
+    ap.add_argument("--vol-lookback", type=int, default=20, help="Bars of realized vol for the regime estimate")
     ap.add_argument(
         "--costs",
         choices=sorted(PRESETS),
@@ -133,6 +136,8 @@ def main() -> None:
         sizing_mode=args.sizing,
         risk_pct=args.risk_pct,
         max_pos_pct=args.max_pos_pct,
+        vol_target=args.vol_target,
+        vol_lookback=args.vol_lookback,
     )
     result = engine.run()
 
