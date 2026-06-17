@@ -75,6 +75,10 @@ class StrategyBacktestEngine(BacktestEngine):
         min_52wh_prox: float = -1.0,
         trail_mult: float = 0.0,
         be_activate: float = 0.0,
+        max_positions: int = MAX_POSITIONS,
+        sizing_mode: str = "equal",   # equal | conviction | inverse_atr
+        risk_pct: float = 0.02,       # per-trade equity risk for inverse_atr
+        max_pos_pct: float = 0.35,    # cap any single position at this fraction
         sector_map: dict[str, str] | None = None,
         market: str = "nasdaq",
     ):
@@ -84,6 +88,10 @@ class StrategyBacktestEngine(BacktestEngine):
         self.stop_mult = stop_mult
         self.holding_max = holding_max
         self.min_52wh_prox = min_52wh_prox
+        self.max_positions = max(1, max_positions)
+        self.sizing_mode = sizing_mode
+        self.risk_pct = risk_pct
+        self.max_pos_pct = max_pos_pct
         # Chandelier trailing stop: once a position runs up, ratchet the stop to
         # (highest-high-since-entry − trail_mult·ATR). 0 = off (fixed stop only).
         self.trail_mult = max(0.0, trail_mult)
@@ -265,7 +273,7 @@ class StrategyBacktestEngine(BacktestEngine):
         generic engine — execution is shared.
         """
         held = self.ledger.held_symbols()
-        open_slots = MAX_POSITIONS - len(held)
+        open_slots = self.max_positions - len(held)
         if open_slots <= 0 or not signals:
             return []
 
@@ -295,10 +303,37 @@ class StrategyBacktestEngine(BacktestEngine):
         total_value = self.ledger.total_value(
             {s: p for s, p in prices_today.items() if p is not None}
         )
-        target_capital = total_value / MAX_POSITIONS  # equal-weight slug
+        cap_ceiling = total_value * self.max_pos_pct
+
+        def _slug(signal) -> float:
+            """Capital for one position under the active sizing mode (capped)."""
+            equal = total_value / self.max_positions
+            if self.sizing_mode == "inverse_atr":
+                # Equal-RISK: each trade risks risk_pct of equity at its stop. A
+                # tight-ATR name gets more capital, a wide-ATR name less.
+                entry, stop = signal.entryPrice, signal.stopLoss
+                if entry and stop and entry > stop:
+                    stop_frac = (entry - stop) / entry
+                    return min(cap_ceiling, total_value * self.risk_pct / stop_frac)
+                return min(cap_ceiling, equal)
+            if self.sizing_mode == "conviction":
+                # Tilt toward higher-momentum names: 0.6×–1.6× the equal slug by the
+                # candidate's cross-sectional momentum percentile.
+                ser = self._mom_series(signal.symbol) if self.rank_momentum_weight > 0 else None
+                pct = 0.5
+                if ser is not None:
+                    hits = ser.loc[ser.index <= date]
+                    if not hits.empty and pd.notna(hits.iloc[-1]):
+                        vals = sorted(v for s2 in fresh
+                                      for v in [self._mom_at(s2.symbol, date)] if v is not None)
+                        v = float(hits.iloc[-1])
+                        pct = (sum(1 for x in vals if x <= v) / len(vals)) if vals else 0.5
+                return min(cap_ceiling, equal * (0.6 + pct))
+            return equal  # equal-weight
 
         if self.sector_gate is None:
-            return [(signal, target_capital) for signal in fresh]
+            return [(signal, _slug(signal)) for signal in fresh]
+        target_capital = total_value / self.max_positions
 
         # Apply the macro→sector gate: filter/veto drops entries, weight scales the
         # slug by the appetite factor. None analysis → gate is a no-op.
@@ -330,6 +365,15 @@ class StrategyBacktestEngine(BacktestEngine):
             s = c.shift(self.mom_skip) / c.shift(max(1, self.mom_lookback - 1)) - 1.0
             self._mom_cache[sym] = s
         return s
+
+    def _mom_at(self, sym: str, date: pd.Timestamp) -> float | None:
+        ser = self._mom_series(sym)
+        if ser is None:
+            return None
+        hits = ser.loc[ser.index <= date]
+        if hits.empty or pd.isna(hits.iloc[-1]):
+            return None
+        return float(hits.iloc[-1])
 
     def _setup_momentum_key(self, fresh: list, date: pd.Timestamp):
         """Rank key = (1-w)·setup + w·(cross-sectional 12-1m momentum percentile).

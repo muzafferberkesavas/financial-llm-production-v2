@@ -59,7 +59,7 @@ def main() -> None:
     ap.add_argument(
         "--rank-momentum",
         type=float,
-        default=0.0,
+        default=0.5,
         help="Blend cross-sectional 12-1m momentum percentile into slot selection (0..1, 0=off)",
     )
     ap.add_argument("--mom-lookback", type=int, default=252,
@@ -78,6 +78,12 @@ def main() -> None:
                     help="Chandelier trailing-stop ATR multiple (0=off; let winners run, lock gains)")
     ap.add_argument("--be-activate", type=float, default=0.0,
                     help="Arm trail + breakeven floor only after peak gain ≥ this (e.g. 0.03=+3%%)")
+    ap.add_argument("--max-positions", type=int, default=7,
+                    help="Max concurrent positions (lower = more concentrated = higher return/risk)")
+    ap.add_argument("--sizing", choices=["equal", "conviction", "inverse_atr"], default="conviction",
+                    help="Position sizing: equal-weight / momentum-conviction-tilted / equal-risk")
+    ap.add_argument("--risk-pct", type=float, default=0.02, help="Per-trade equity risk for inverse_atr")
+    ap.add_argument("--max-pos-pct", type=float, default=0.35, help="Cap any single position at this fraction")
     ap.add_argument(
         "--costs",
         choices=sorted(PRESETS),
@@ -123,6 +129,10 @@ def main() -> None:
         min_52wh_prox=args.min_52wh_prox,
         trail_mult=args.trail_mult,
         be_activate=args.be_activate,
+        max_positions=args.max_positions,
+        sizing_mode=args.sizing,
+        risk_pct=args.risk_pct,
+        max_pos_pct=args.max_pos_pct,
     )
     result = engine.run()
 
