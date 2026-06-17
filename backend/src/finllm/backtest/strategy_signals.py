@@ -135,6 +135,7 @@ def strategy_signal(
     target_mult: float = ATR_TARGET_MULT,
     stop_mult: float = ATR_STOP_MULT,
     holding_max: int = DEFAULT_HOLDING_MAX,
+    min_52wh_prox: float = -1.0,
 ) -> Signal | None:
     """Emit a BUY Signal if `prices` (up to `now`) passes Stage 1 and shows a
     Stage 1B setup at or above `min_setup_score`. Otherwise None.
@@ -146,6 +147,14 @@ def strategy_signal(
     passed, ind = passes_hard_filter(prices, thresholds)
     if not passed:
         return None
+
+    # 52-week-high proximity gate (George-Hwang JoF 2004: nearness to the 52wk high
+    # predicts momentum returns better than past return, and SELECTS the winners
+    # rather than vetoing them). -1.0 = off. e.g. -0.15 = require within 15% of high.
+    if min_52wh_prox > -1.0 and len(prices) >= 252:
+        high_52w = float(prices["high"].iloc[-252:].max())
+        if high_52w > 0 and (ind["close"] / high_52w - 1.0) < min_52wh_prox:
+            return None
 
     ema21 = ind["ema21"]
     setup_type, score, meta = _best_setup(prices, ema21)

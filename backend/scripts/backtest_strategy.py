@@ -72,6 +72,8 @@ def main() -> None:
                     help="ATR stop multiple (lower = tighter stop; 2.5 default after whipsaw analysis)")
     ap.add_argument("--holding-max", type=int, default=20,
                     help="Max holding days (swing thesis ≈ 5-8; default 20 = ~1 month)")
+    ap.add_argument("--min-52wh-prox", type=float, default=-1.0,
+                    help="Require entry within this fraction of the 52wk high (-0.15=within 15%%; -1=off)")
     ap.add_argument("--trail-mult", type=float, default=0.0,
                     help="Chandelier trailing-stop ATR multiple (0=off; let winners run, lock gains)")
     ap.add_argument("--be-activate", type=float, default=0.0,
@@ -118,6 +120,7 @@ def main() -> None:
         target_mult=args.target_mult,
         stop_mult=args.stop_mult,
         holding_max=args.holding_max,
+        min_52wh_prox=args.min_52wh_prox,
         trail_mult=args.trail_mult,
         be_activate=args.be_activate,
     )

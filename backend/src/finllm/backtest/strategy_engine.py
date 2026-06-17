@@ -72,6 +72,7 @@ class StrategyBacktestEngine(BacktestEngine):
         target_mult: float = 4.0,
         stop_mult: float = 2.5,
         holding_max: int = 20,
+        min_52wh_prox: float = -1.0,
         trail_mult: float = 0.0,
         be_activate: float = 0.0,
         sector_map: dict[str, str] | None = None,
@@ -82,6 +83,7 @@ class StrategyBacktestEngine(BacktestEngine):
         self.target_mult = target_mult
         self.stop_mult = stop_mult
         self.holding_max = holding_max
+        self.min_52wh_prox = min_52wh_prox
         # Chandelier trailing stop: once a position runs up, ratchet the stop to
         # (highest-high-since-entry − trail_mult·ATR). 0 = off (fixed stop only).
         self.trail_mult = max(0.0, trail_mult)
@@ -247,7 +249,7 @@ class StrategyBacktestEngine(BacktestEngine):
             sig = strategy_signal(
                 sym, window, date.to_pydatetime(), self.thresholds, self.min_setup_score,
                 target_mult=self.target_mult, stop_mult=self.stop_mult,
-                holding_max=self.holding_max,
+                holding_max=self.holding_max, min_52wh_prox=self.min_52wh_prox,
             )
             if sig is not None:
                 signals.append(sig)
