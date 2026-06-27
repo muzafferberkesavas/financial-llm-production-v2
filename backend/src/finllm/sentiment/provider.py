@@ -27,6 +27,19 @@ class SentimentProvider(Protocol):
     def score_batch(self, texts: list[str]) -> list[SentimentResult]: ...
 
 
+class DisabledProvider:
+    """Sentiment kapalı — her metin için nötr (polarity 0.0) döner.
+
+    BIST/teknik-odaklı lokal kurulumda FinBERT (torch) veya uzak FinGPT
+    kurmadan çalışmak için. Sinyal akışı sentiment'i nötr girdi olarak görür.
+    """
+    def score_batch(self, texts: list[str]) -> list[SentimentResult]:
+        return [
+            SentimentResult(text=t, label="neutral", score=1.0, polarity=0.0)
+            for t in texts
+        ]
+
+
 class FinBERTProvider:
     """Lokal FinBERT (Mac MPS / CPU). Mevcut sentiment/finbert.py'yi sarar."""
     def score_batch(self, texts: list[str]) -> list[SentimentResult]:
@@ -73,6 +86,9 @@ class FinGPTProvider:
 
 def get_provider() -> SentimentProvider:
     name = settings.sentiment_provider.lower()
+    if name in ("disabled", "off", "none", "neutral"):
+        logger.info("Sentiment provider DISABLED — nötr polarite (FinBERT/torch gerekmez).")
+        return DisabledProvider()
     if name == "finbert":
         return FinBERTProvider()
     if name == "fingpt":

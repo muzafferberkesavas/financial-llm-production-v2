@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     reasoner_mode: str = Field(default="ensemble", alias="REASONER_MODE")
 
     # === Sentiment provider ===
-    # "finbert" = lokal FinBERT (Mac MPS), "fingpt" = uzak FinGPT (AWS endpoint)
-    sentiment_provider: str = Field(default="finbert", alias="SENTIMENT_PROVIDER")
+    # "disabled" = sentiment kapalı/nötr (torch GEREKMEZ — varsayılan, BIST/teknik odak).
+    # "finbert" = lokal FinBERT (Mac MPS, torch ister), "fingpt" = uzak FinGPT (AWS endpoint)
+    sentiment_provider: str = Field(default="disabled", alias="SENTIMENT_PROVIDER")
     fingpt_endpoint: str | None = Field(default=None, alias="FINGPT_ENDPOINT")
     fingpt_api_key: str | None = Field(default=None, alias="FINGPT_API_KEY")
 

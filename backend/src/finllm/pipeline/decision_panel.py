@@ -88,6 +88,11 @@ def run_decision_panel(
 
     result = PanelResult(ranked=ranked)
     if not run_debate or top_n <= 0:
+        # Debate yok (ör. --no-debate, $0 anahtarsız mod): yine de top-N adayı
+        # debate=None ile karar olarak ekle. Böylece export/serileştirme teknik
+        # sıralamayı "IZLE" sinyali olarak UI'a yazabilir (LLM çağrısı olmadan).
+        if top_n > 0:
+            result.decisions = [PanelDecision(candidate=cs) for cs in ranked[:top_n]]
         return result
     if debate_client is None:
         raise ValueError("run_debate=True requires a debate_client")

@@ -120,6 +120,11 @@ def resolve(name_or_list: str) -> list[str]:
             raise ValueError("sp500 universe not fetched — run scripts/fetch_sp500_universe.py")
         return syms
     if key in ("bist", "bist100"):
+        # Önce düzenlenebilir listeyi dene (data/universes/bist100.json) — arkadaş
+        # buradan sembol ekleyip çıkarabilsin. Yoksa koddaki BIST-100'e düş.
+        rows = _load_universe_json("bist100")
+        if rows:
+            return [r["symbol"] for r in rows]
         from finllm.markets.universes.bist_100 import BIST_100_TICKERS
         return [f"{t.symbol}.IS" for t in BIST_100_TICKERS]
     if key in _LAZY:

@@ -61,6 +61,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3007",
+        "http://localhost:5173",  # frontend-vue (Vite)
         "https://*.vercel.app",
     ],
     allow_credentials=True,
@@ -82,6 +83,18 @@ def health() -> dict:
             "telegram": bool(settings.telegram_bot_token),
         },
     }
+
+
+@app.get("/v2/commodities")
+@app.get("/commodities")
+def commodities() -> dict:
+    """Canlı altın (USD + gram-TRY), gümüş, USD/TRY — ücretsiz, LLM yok.
+
+    frontend-vue panel'i bu endpoint'i bekliyor; panel_server ile aynı kaynak.
+    """
+    from finllm.data.commodities import fetch_commodities
+
+    return fetch_commodities().as_dict()
 
 
 @app.get("/")

@@ -60,6 +60,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="End-to-end decision panel")
     ap.add_argument("--market", choices=["nasdaq", "bist"], default="nasdaq")
     ap.add_argument("--symbols", default=None, help="comma list; defaults per market")
+    ap.add_argument(
+        "--universe", default=None,
+        help="adlı evren (ör. 'bist' = düzenlenebilir data/universes/bist100.json). "
+             "Verilirse --symbols yerine geçer. Liste uzunsa ilk çalıştırma yavaştır.",
+    )
     ap.add_argument("--top-n", type=int, default=4)
     ap.add_argument("--no-debate", action="store_true")
     ap.add_argument("--no-macro", action="store_true")
@@ -69,7 +74,12 @@ def main() -> None:
 
     market = args.market
     tmap = build_tmap(market)
-    symbols = [s.strip().upper() for s in (args.symbols or DEFAULTS[market]).split(",") if s.strip()]
+    if args.universe:
+        from finllm.backtest.universe import resolve
+        symbols = resolve(args.universe)
+        console.print(f"[dim]Evren '{args.universe}': {len(symbols)} sembol[/dim]")
+    else:
+        symbols = [s.strip().upper() for s in (args.symbols or DEFAULTS[market]).split(",") if s.strip()]
     thresholds = get_adapter(market).thresholds
 
     # 1) assemble candidate inputs (real setups + fundamentals + finnhub)

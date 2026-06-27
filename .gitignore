@@ -7,8 +7,11 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# Data & models
-backend/data/
+# Data & models — lokal state ignored, SADECE düzenlenebilir BIST universe listesi tutulur
+backend/data/*
+!backend/data/universes/
+backend/data/universes/*
+!backend/data/universes/bist100.json
 backend/models_cache/
 *.parquet
 *.duckdb

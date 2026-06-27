@@ -3,7 +3,13 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+
+# twopirllc/pandas-ta kaldırıldı; pandas-ta-classic birebir devamı (aynı API).
+# Eski ortamlarda hâlâ pandas_ta varsa onu kullan.
+try:
+    import pandas_ta as ta
+except ModuleNotFoundError:
+    import pandas_ta_classic as ta
 
 
 def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:

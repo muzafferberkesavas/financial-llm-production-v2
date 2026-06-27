@@ -4,9 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
+# NOT: torch/transformers ağır ve opsiyonel ("nlp" extra). Bu modülü import etmek
+# torch kurulu olmadan da çökmemeli — gerçek importlar fonksiyon içinde (lazy) yapılır.
 from finllm.utils.logging import logger
 
 MODEL_ID = "ProsusAI/finbert"
@@ -23,6 +22,14 @@ class SentimentResult:
 
 @lru_cache(maxsize=1)
 def _load():
+    try:
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    except ModuleNotFoundError as e:
+        raise RuntimeError(
+            "FinBERT için torch/transformers gerekli ama kurulu değil. "
+            "Kur: `pip install -e '.[nlp]'` — veya SENTIMENT_PROVIDER=disabled kullan."
+        ) from e
     device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"FinBERT yükleniyor (device={device})")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
@@ -31,34 +38,36 @@ def _load():
     return tokenizer, model, device
 
 
-@torch.inference_mode()
 def score_batch(texts: list[str], batch_size: int = 16) -> list[SentimentResult]:
     if not texts:
         return []
+    import torch  # lazy — _load() zaten torch yoksa anlamlı hata verir
+
     tokenizer, model, device = _load()
     results: list[SentimentResult] = []
 
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i : i + batch_size]
-        enc = tokenizer(
-            batch,
-            padding=True,
-            truncation=True,
-            max_length=256,
-            return_tensors="pt",
-        ).to(device)
-        logits = model(**enc).logits
-        probs = torch.softmax(logits, dim=-1).cpu().numpy()
-        for text, p in zip(batch, probs):
-            idx = int(p.argmax())
-            results.append(
-                SentimentResult(
-                    text=text,
-                    label=LABELS[idx],
-                    score=float(p[idx]),
-                    polarity=float(p[0] - p[1]),  # pos - neg
+    with torch.inference_mode():
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            enc = tokenizer(
+                batch,
+                padding=True,
+                truncation=True,
+                max_length=256,
+                return_tensors="pt",
+            ).to(device)
+            logits = model(**enc).logits
+            probs = torch.softmax(logits, dim=-1).cpu().numpy()
+            for text, p in zip(batch, probs):
+                idx = int(p.argmax())
+                results.append(
+                    SentimentResult(
+                        text=text,
+                        label=LABELS[idx],
+                        score=float(p[idx]),
+                        polarity=float(p[0] - p[1]),  # pos - neg
+                    )
                 )
-            )
     return results
 
 
