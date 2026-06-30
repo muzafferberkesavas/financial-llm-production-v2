@@ -29,7 +29,7 @@ import pandas as pd
 
 from finllm.markets.base import FilterThresholds
 from finllm.pipeline.stage1_filter import _compute_adr_pct, _compute_ema
-from finllm.pipeline.stage1b_setup import _best_setup
+from finllm.indicators.scorecard._setup_helpers import _best_setup
 from finllm.signals.schema import (
     FactorScore,
     HoldingDays,

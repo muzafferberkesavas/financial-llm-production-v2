@@ -1,4 +1,12 @@
-"""Stage 1B — Setup detection: pullback-to-EMA + volume breakout.
+"""DEPRECATED: Setup detection artik stage1c icinde calisir.
+
+Pattern algilama fonksiyonlari finllm.indicators.scorecard._setup_helpers'a tasindi.
+Bu dosya sadece backtest/strategy_signals.py uyumlulugu icin korunuyor.
+run_stage1b() artik orchestrator tarafindan cagrilmiyor.
+
+---
+
+Stage 1B — Setup detection: pullback-to-EMA + volume breakout.
 
 Kullanıcının manuel TradingView'da avladığı pattern'in algoritmik versiyonu
 (bkz memory/trading-strategy.md):

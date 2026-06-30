@@ -1,14 +1,13 @@
-"""Stage 1C — Indicators + derived + confluence → Candidate.indicators.
+"""Stage 1C — Indicators + derived + confluence + setup detection → Candidate.indicators.
 
-Akış:
-    1. features/technical.py ile ~50 ham gösterge hesapla (pandas-ta)
+Akis:
+    1. features/technical.py ile ~50 ham gosterge hesapla (pandas-ta)
     2. indicators/derived.py ile OBV div, BB squeeze, weekly trend ekle
-    3. indicators/confluence.py ile 8-bileşenli skor
-    4. detect_market_regime → Candidate.regime
-    5. confluence_to_signal_suggestion → ranking için kullanılır
-
-Phase 1'de pricesonly hard filter geçenlerde hesaplanır (cost optimization);
-Phase 2'de full universe için (cross-sectional ranking).
+    3. indicators/confluence.py ile 8-bilesenkli skor
+    4. detect_market_regime -> Candidate.regime
+    5. Setup detection (stage1b'den absorbe edildi)
+    6. S/R, slope, volume profile gostergeleri (scorecard v2 icin)
+    7. confluence_to_signal_suggestion -> ranking icin kullanilir
 """
 from __future__ import annotations
 
@@ -28,6 +27,14 @@ from finllm.indicators import (
     detect_market_regime,
 )
 from finllm.indicators.fundamentals import compute_fundamental_score
+from finllm.indicators.scorecard._setup_helpers import detect_setup
+from finllm.indicators.scorecard._slope_helpers import indicator_slope
+from finllm.indicators.scorecard._sr_helpers import (
+    breakout_age,
+    compute_fibonacci_sr,
+    compute_volume_profile_simple,
+    detect_pivot_lows,
+)
 from finllm.pipeline.context import Candidate, PipelineContext
 from finllm.utils.logging import logger
 
@@ -212,6 +219,67 @@ def _enrich_candidate(cand: Candidate) -> None:
         fund_score = compute_fundamental_score(fund_snap)
         cand.fundamental_score = fund_score.total
         cand.fundamental_detail = fund_score.as_dict()
+
+    # 11. Setup detection (stage1b absorbe)
+    ema21 = cand.indicators.get("ema21")
+    setup_type, setup_conf, setup_meta = detect_setup(
+        prices, ema21, cand, cand.ingested.fundamentals,
+    )
+    cand.setup_type = setup_type
+    cand.setup_confidence = setup_conf
+    cand.setup_metadata = setup_meta
+
+    # 12. Slope gostergeleri (c66, c67, c68, c69)
+    if "rsi_14" in enriched.columns and len(enriched) >= 10:
+        rsi_series = enriched["rsi_14"].dropna().values
+        cand.indicators["rsi_14_series"] = list(rsi_series[-10:]) if len(rsi_series) >= 10 else None
+        cand.indicators["rsi_slope_10"] = indicator_slope(rsi_series, 10)
+        cand.indicators["rsi_slope_5"] = indicator_slope(rsi_series, 5)
+
+    if "adx_14" in enriched.columns and len(enriched) >= 5:
+        adx_series = enriched["adx_14"].dropna().values
+        cand.indicators["adx_14_series"] = list(adx_series[-5:]) if len(adx_series) >= 5 else None
+        cand.indicators["adx_slope_5"] = indicator_slope(adx_series, 5)
+
+    if "macd_hist" in enriched.columns and len(enriched) >= 5:
+        macd_series = enriched["macd_hist"].dropna().values
+        cand.indicators["macd_hist_series"] = list(macd_series[-5:]) if len(macd_series) >= 5 else None
+        cand.indicators["macd_slope_5"] = indicator_slope(macd_series, 5)
+        cand.indicators["macd_hist_values"] = list(macd_series[-5:]) if len(macd_series) >= 5 else None
+
+    if "obv" in enriched.columns and len(enriched) >= 20:
+        obv_series = enriched["obv"].dropna().values
+        cand.indicators["obv_slope_5"] = indicator_slope(obv_series, 5)
+        cand.indicators["obv_slope_20"] = indicator_slope(obv_series, 20)
+
+    # 13. S/R seviyeleri + volume profile (c72-c79)
+    supports, resistances = compute_fibonacci_sr(prices, lookbacks=[20, 50])
+    cand.indicators["fib_supports"] = supports
+    cand.indicators["fib_resistances"] = resistances
+
+    vpoc, va_high, va_low = compute_volume_profile_simple(prices, window=30)
+    cand.indicators["vpoc"] = vpoc
+    cand.indicators["va_high"] = va_high
+    cand.indicators["va_low"] = va_low
+
+    pivot_lows = detect_pivot_lows(prices, lookback=5)
+    cand.indicators["pivot_lows"] = pivot_lows
+
+    donch_upper = cand.indicators.get("donch_pct")
+    # For breakout_age we need the actual donchian upper value, compute from prices
+    if len(prices) >= 20:
+        donch_upper_val = float(prices["high"].tail(20).max())
+        age_days, vol_conf = breakout_age(prices, donch_upper_val)
+        cand.indicators["breakout_age_days"] = age_days
+        cand.indicators["breakout_vol_confirmed"] = vol_conf
+
+    # 14. Price-volume correlation (c71)
+    if len(prices) >= 20:
+        recent_close = prices["close"].tail(20).values
+        recent_vol = prices["volume"].tail(20).values
+        if len(recent_close) == 20 and np.std(recent_close) > 0 and np.std(recent_vol) > 0:
+            corr = float(np.corrcoef(recent_close, recent_vol)[0, 1])
+            cand.indicators["price_vol_corr_20"] = corr if not np.isnan(corr) else None
 
 
 def run_stage1c(

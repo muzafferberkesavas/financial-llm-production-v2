@@ -21,14 +21,20 @@ from finllm.indicators.fundamentals import (
     SECTOR_BENCHMARKS,
     compute_fundamental_score,
 )
+from finllm.indicators.scorecard import (
+    MasterScore,
+    compute_master_score,
+)
 
 __all__ = [
     "ConfluenceComponents",
     "FundamentalScore",
+    "MasterScore",
     "SECTOR_BENCHMARKS",
     "compute_bb_squeeze",
     "compute_confluence",
     "compute_fundamental_score",
+    "compute_master_score",
     "compute_obv_divergence",
     "compute_swing_levels",
     "compute_weekly_trend",

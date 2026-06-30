@@ -27,7 +27,6 @@ from finllm.pipeline.regime import run_regime_check
 from finllm.pipeline.stage0_ingest import run_stage0
 from finllm.pipeline.stage0b_agenda import run_stage0b
 from finllm.pipeline.stage1_filter import run_stage1
-from finllm.pipeline.stage1b_setup import run_stage1b
 from finllm.pipeline.stage1c_features import run_stage1c
 from finllm.pipeline.stage3_deep import run_stage3
 from finllm.pipeline.stage4_5_backtest_gate import run_stage4_5
@@ -61,9 +60,9 @@ def run_pipeline(
     output_dir: Path | None = None,
     lookback_days: int = 400,
     max_pass_to_stage3: int = 12,
-    min_setup_score: float = 0.3,
     skip_backtest_gate: bool = False,
     skip_news_agenda: bool = False,
+    min_setup_score: float = 0.3,  # deprecated, kept for caller compat
 ) -> PipelineContext:
     """Tüm funnel'ı uçtan uca çalıştır.
 
@@ -75,7 +74,6 @@ def run_pipeline(
         output_dir: JSON output klasörü (default backend/out/)
         lookback_days: Stage 0 fiyat geçmişi
         max_pass_to_stage3: Stage 1C master_score → Stage 3 quota
-        min_setup_score: Stage 1B setup eşiği
         skip_backtest_gate: True ise Stage 4.5 atlanır (hızlı test için)
 
     Returns:
@@ -117,7 +115,7 @@ def run_pipeline(
         logger.info("[PIPELINE] Stage 0b skipped (mock backend, no Claude available)")
 
     run_stage1(ctx)
-    run_stage1b(ctx, min_setup_score=min_setup_score)
+    # Stage 1B (setup detection) artik stage1c icinde calisir
     run_stage1c(ctx, max_pass_to_stage3=max_pass_to_stage3)
     run_stage3(ctx, client=deep_llm)
     run_stage4(ctx)
