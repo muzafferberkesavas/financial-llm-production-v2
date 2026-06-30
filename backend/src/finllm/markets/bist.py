@@ -52,9 +52,6 @@ class BistAdapter(MarketAdapter):
         min_avg_volume_10d=100_000,         # 100K shares/gün
         min_daily_dollar_volume=10_000_000, # 10M TRY günlük likidite
         min_adr_pct=2.0,                    # Average Daily Range >= 2%
-        require_close_above_ema21=True,
-        require_close_above_ema50=True,
-        require_green_day=True,
     )
 
     transaction_cost = TransactionCostModel(

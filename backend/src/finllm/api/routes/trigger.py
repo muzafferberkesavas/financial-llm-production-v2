@@ -19,7 +19,7 @@ class TriggerRequest(BaseModel):
     market: Literal["bist", "nasdaq"]
     mode: Literal["pre_market", "intraday", "end_of_day"] = "pre_market"
     capital: float = 10_000.0
-    llm_backend: Literal["mock", "claude", "claude-screen-only", "claude-deep-only"] = "mock"
+    llm_backend: Literal["mock", "claude", "claude-deep-only"] = "mock"
     max_pass_to_stage3: int = 12
     skip_backtest: bool = False
     skip_news: bool = False

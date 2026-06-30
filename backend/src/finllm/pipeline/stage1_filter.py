@@ -93,27 +93,13 @@ def _check_one(data: IngestedData, thresholds, currency: str) -> Candidate:
             f"({daily_dollar:.2e})"
         )
 
-    # 6. ADR%
+    # 6. ADR% (hesaplama kalır, puanlamaya taşındı — hard reject yok)
     adr = _compute_adr_pct(prices, period=20)
-    if adr < thresholds.min_adr_pct:
-        return cand.reject(f"adr<{thresholds.min_adr_pct}% ({adr:.2f}%)")
 
-    # 7. EMA21 / EMA50 uptrend
+    # 7. EMA21 / EMA50 (hesaplama kalır, puanlamaya taşındı — hard reject yok)
     closes = prices["close"]
     ema21 = _compute_ema(closes, 21)
     ema50 = _compute_ema(closes, 50)
-
-    if thresholds.require_close_above_ema21:
-        if ema21 is None:
-            return cand.reject("ema21_insufficient_data")
-        if close <= ema21:
-            return cand.reject(f"close<=ema21 ({close:.2f} <= {ema21:.2f})")
-
-    if thresholds.require_close_above_ema50:
-        if ema50 is None:
-            return cand.reject("ema50_insufficient_data")
-        if close <= ema50:
-            return cand.reject(f"close<=ema50 ({close:.2f} <= {ema50:.2f})")
 
     # Hepsi geçti — score için ekstra metadata
     cand.passed_hard_filter = True

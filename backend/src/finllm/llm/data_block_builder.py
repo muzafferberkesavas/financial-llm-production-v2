@@ -26,7 +26,8 @@ CONFLUENCE_SIGNAL: AL (confidence: 0.50-0.69)
 """
 from __future__ import annotations
 
-from finllm.data.news.base import MarketAgenda
+from finllm.data.news.base import CorporateDisclosure, MarketAgenda
+from finllm.data.news.kap_translator import format_kap_section
 from finllm.indicators.confluence import confluence_to_signal_suggestion
 from finllm.pipeline.context import Candidate
 
@@ -182,12 +183,14 @@ def _obv_line(
 def build_data_block(
     cand: Candidate,
     market_agenda: MarketAgenda | None = None,
+    kap_disclosures: list[CorporateDisclosure] | None = None,
 ) -> str:
     """Bir Candidate için zengin data block üret — LLM'e gönderilecek prompt parçası.
 
     Args:
         cand: indicators + confluence dolu Candidate (Stage 1C sonrası)
         market_agenda: opsiyonel MARKET AGENDA (Stage 0B'den) — Layer 0 news context
+        kap_disclosures: opsiyonel per-ticker KAP disclosures (rule-based TR→EN)
     """
     ind = cand.indicators
     ticker = cand.ticker
@@ -222,12 +225,12 @@ def build_data_block(
         f"VolRatio={_f(vol_ratio, 2)}x({_vol_label(vol_ratio)})"
     )
 
-    rsi_line = f"RSI14: {_f(ind.get('rsi_14'))} | Momentum={_rsi_momentum(ind.get('rsi_14'), None)}"
+    rsi_line = f"RSI14: {_f(ind.get('rsi_14'))} | Momentum={_rsi_momentum(ind.get('rsi_14'), ind.get('prev_rsi_14'))}"
 
     macd_line = (
         f"MACD: {_f(ind.get('macd'))}/Signal={_f(ind.get('macd_signal'))}/"
         f"Hist={_f(ind.get('macd_hist'), 3)} | "
-        f"Status={_macd_status(ind.get('macd_hist'), None)}"
+        f"Status={_macd_status(ind.get('macd_hist'), ind.get('prev_macd_hist'))}"
     )
 
     bb_line = (
@@ -254,6 +257,16 @@ def build_data_block(
     )
 
     atr_line = f"ATR14: {_f(ind.get('atr_14'))}"
+
+    # Candlestick patterns
+    candle_parts = []
+    if ind.get("pattern_bull_engulf") and ind["pattern_bull_engulf"] > 0:
+        candle_parts.append("BULL_ENGULF")
+    if ind.get("pattern_hammer") and ind["pattern_hammer"] > 0:
+        candle_parts.append("HAMMER")
+    if ind.get("pattern_doji") and ind["pattern_doji"] > 0:
+        candle_parts.append("DOJI")
+    candle_line = f"CANDLE_PATTERNS: {', '.join(candle_parts) if candle_parts else 'NONE'}"
 
     setup_line = f"SETUP: {cand.setup_type} ({cand.setup_confidence:.2f}) | meta={cand.setup_metadata}"
 
@@ -370,6 +383,11 @@ def build_data_block(
 
     regime_line = f"MARKET_REGIME: {cand.regime}"
 
+    # Master scorecard line
+    master_line = ""
+    if cand.master_score is not None and hasattr(cand.master_score, 'summary_line'):
+        master_line = f"MASTER_SCORE: {cand.master_score.summary_line()} | RANK_BASIS=true"
+
     sections = [
         header,
         regime_line,
@@ -381,6 +399,7 @@ def build_data_block(
         adx_line,
         atr_line,
         obv_line,
+        candle_line,
         setup_line,
         weekly_line,
         timeframe_line,
@@ -390,9 +409,18 @@ def build_data_block(
         confluence_signal_line,
     ]
 
+    if master_line:
+        sections.append(master_line)
+
     # Fundamental block (Phase 3.1) — confluence'tan sonra ekle
     if fundamentals_block:
         sections.append(fundamentals_block)
+
+    # Per-ticker KAP disclosures (rule-based TR→EN, no LLM cost)
+    if kap_disclosures:
+        kap_block = format_kap_section(kap_disclosures)
+        if kap_block:
+            sections.append(kap_block)
 
     # Layer 0: MARKET AGENDA — header'dan önce prepend
     if market_agenda is not None and not market_agenda.is_empty:

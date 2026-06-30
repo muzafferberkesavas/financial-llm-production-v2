@@ -53,7 +53,7 @@ def main() -> int:
         "--quota",
         type=int,
         default=12,
-        help="Stage 2 → 3 max hisse sayısı (default: 12)",
+        help="Stage 1C master_score → Stage 3 max hisse sayısı (default: 12)",
     )
     parser.add_argument(
         "--min-setup-score",
@@ -63,7 +63,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--llm",
-        choices=["mock", "claude", "claude-screen-only", "claude-deep-only"],
+        choices=["mock", "claude", "claude-deep-only"],
         default="mock",
         help="LLM backend (default: mock — gerçek API call yok)",
     )

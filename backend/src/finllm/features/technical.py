@@ -43,7 +43,6 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     # === Momentum (klasik) ===
     out["rsi_14"] = ta.rsi(c, length=14)
     out["rsi_7"] = ta.rsi(c, length=7)
-    out["mom_10"] = ta.mom(c, length=10)
     macd = ta.macd(c, fast=12, slow=26, signal=9)
     if macd is not None and not macd.empty:
         out["macd"] = macd.iloc[:, 0]

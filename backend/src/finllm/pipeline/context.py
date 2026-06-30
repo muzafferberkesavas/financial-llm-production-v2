@@ -65,6 +65,7 @@ class IngestedData:
     prices: pd.DataFrame                          # OHLCV, son ~1 yıl
     fundamentals: FundamentalSnapshot | None
     news: list[dict] = field(default_factory=list)
+    quarterly: object | None = None               # QuarterlyFinancials (fetch now, integrate later)
     fetch_errors: list[str] = field(default_factory=list)
 
     @property
@@ -115,6 +116,9 @@ class Candidate:
     # Stage 1C — fundamental analysis (Phase 3.1)
     fundamental_score: int = 0               # 0-100 (value + quality + growth)
     fundamental_detail: dict[str, Any] = field(default_factory=dict)
+
+    # Stage 1C — master scorecard (50-kriter, 0-200)
+    master_score: object | None = None
 
     # Stage 2 — cheap LLM screen
     screen_verdict: Literal["strong", "potential", "skip", "pending"] = "pending"
@@ -196,6 +200,7 @@ class ExtendedSignal:
     confluence_score: int = 0
     market_regime: str = ""
     weekly_trend: str = ""
+    master_score_pct: float | None = None
 
     # Audit
     llm_model: str = ""
@@ -249,6 +254,9 @@ class PipelineContext:
     # Market agenda (Phase 2.2 — news context)
     # MarketAgenda objesi — type hint için import yapmıyoruz (circular avoid)
     market_agenda: object | None = None
+
+    # Per-ticker KAP disclosures (rule-based TR→EN, no LLM cost)
+    kap_per_ticker: dict[str, list] = field(default_factory=dict)
 
     # Metrics
     total_cost_usd: float = 0.0

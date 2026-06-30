@@ -61,6 +61,7 @@ def _signal_to_dict(sig: ExtendedSignal) -> dict:
         "confluence_score": sig.confluence_score,
         "market_regime": sig.market_regime,
         "weekly_trend": sig.weekly_trend,
+        "master_score_pct": sig.master_score_pct,
         "confirmation_count": sig.confirmation_count,
         "backtest_30d_return_pct": sig.backtest_30d_return_pct,
         "backtest_gate_passed": sig.backtest_gate_passed,

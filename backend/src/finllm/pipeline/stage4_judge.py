@@ -30,6 +30,7 @@ def _count_confirmations(sig: ExtendedSignal) -> int:
             sig.expected_return_pct is not None and sig.expected_return_pct >= 8,
             bool(sig.scenarios) and len(sig.scenarios) >= 3,
             not sig.unsourced_flag,
+            sig.master_score_pct is not None and sig.master_score_pct >= 60,
         )
         if v
     )

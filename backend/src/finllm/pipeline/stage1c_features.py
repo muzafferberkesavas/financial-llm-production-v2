@@ -21,6 +21,7 @@ from finllm.features.technical import add_technical_features
 from finllm.indicators import (
     compute_bb_squeeze,
     compute_confluence,
+    compute_master_score,
     compute_obv_divergence,
     compute_swing_levels,
     compute_weekly_trend,
@@ -121,6 +122,23 @@ def _enrich_candidate(cand: Candidate) -> None:
         if k in enriched.columns:
             cand.indicators[k] = _val(last.get(k))
 
+    # 1b. Previous bar values (momentum direction)
+    for prev_key, col_name in [
+        ("prev_rsi_14", "rsi_14"),
+        ("prev_macd_hist", "macd_hist"),
+        ("prev_roc_10", "roc_10"),
+    ]:
+        if col_name in enriched.columns:
+            cand.indicators[prev_key] = _val(prev.get(col_name))
+
+    # 1c. Candlestick patterns
+    for pat in ("pattern_bull_engulf", "pattern_hammer", "pattern_doji"):
+        if pat in enriched.columns:
+            cand.indicators[pat] = _val(last.get(pat))
+
+    # 1d. Previous close (for green day scoring)
+    cand.indicators["prev_close"] = _val(prev.get("close")) if "close" in enriched.columns else None
+
     # 2. Derived: OBV divergence
     if "obv" in enriched.columns:
         obv_info = compute_obv_divergence(prices, enriched["obv"], lookback=5)
@@ -128,6 +146,8 @@ def _enrich_candidate(cand: Candidate) -> None:
         cand.indicators["obv_divergence"] = obv_info["divergence"]
         cand.indicators["obv_divergence_type"] = obv_info["type"]
         cand.indicators["obv_ma20"] = obv_info["obv_ma20"]
+        cand.indicators["obv_ema10"] = obv_info.get("obv_ema10")
+        cand.indicators["obv_ema30"] = obv_info.get("obv_ema30")
         obv_above_ma20 = (
             obv_info["obv_ma20"] is not None
             and cand.indicators.get("obv") is not None
@@ -194,8 +214,12 @@ def _enrich_candidate(cand: Candidate) -> None:
         cand.fundamental_detail = fund_score.as_dict()
 
 
-def run_stage1c(ctx: PipelineContext) -> PipelineContext:
-    """Stage 1C entry: hard filter'ı geçenlere indikatör hesabı + confluence."""
+def run_stage1c(
+    ctx: PipelineContext,
+    max_pass_to_stage3: int = 12,
+    min_master_score_pct: float = 50.0,
+) -> PipelineContext:
+    """Stage 1C entry: indikatör hesabı + confluence + master score + stage3 queue."""
     started = time.perf_counter()
     active = ctx.active_candidates
 
@@ -204,6 +228,36 @@ def run_stage1c(ctx: PipelineContext) -> PipelineContext:
             _enrich_candidate(cand)
         except Exception as e:
             logger.warning(f"[STAGE 1C] {cand.ticker} enrich hatası: {e}")
+
+    # ---- Master Score (50-kriter, cross-sectional) ----
+    # 1. Collect universe fundamentals + dollar volumes
+    universe_fundamentals = {}
+    universe_dollar_volumes = {}
+    for cand in active:
+        snap = cand.ingested.fundamentals
+        if snap is not None:
+            universe_fundamentals[cand.ticker.symbol] = snap
+        close = cand.indicators.get("close")
+        if close is None and cand.ingested.prices is not None and not cand.ingested.prices.empty:
+            close = float(cand.ingested.prices["close"].iloc[-1])
+            cand.indicators["close"] = close
+        vol_sma = cand.indicators.get("vol_sma_20")
+        if close is not None and vol_sma is not None:
+            universe_dollar_volumes[cand.ticker.symbol] = close * vol_sma
+
+    # 2. Compute master score for each candidate
+    for cand in active:
+        try:
+            ms = compute_master_score(
+                cand,
+                universe_fundamentals=universe_fundamentals or None,
+                universe_dollar_volumes=universe_dollar_volumes or None,
+            )
+            cand.master_score = ms
+            cand.indicators["master_score_total"] = ms.total
+            cand.indicators["master_score_pct"] = ms.pct
+        except Exception as e:
+            logger.warning(f"[STAGE 1C] {cand.ticker} master_score hatası: {e}")
 
     duration = time.perf_counter() - started
     ctx.log_stage("stage1c_features", duration)
@@ -223,5 +277,35 @@ def run_stage1c(ctx: PipelineContext) -> PipelineContext:
                 for c in top10
             )
         )
+
+    # Top 10 by master score
+    by_master = sorted(active, key=lambda c: getattr(c.master_score, 'total', 0) if c.master_score else 0, reverse=True)
+    if by_master:
+        top10m = by_master[:10]
+        logger.info(
+            f"[STAGE 1C] top by master_score: "
+            + ", ".join(
+                f"{c.ticker.symbol}({c.master_score.total}/{c.master_score.max_possible}={c.master_score.label})"
+                if c.master_score else f"{c.ticker.symbol}(N/A)"
+                for c in top10m
+            )
+        )
+
+    # ---- Stage 3 Queue: master_score sıralama → min esik → top N ----
+    qualifying = [
+        c for c in by_master
+        if c.master_score is not None and c.master_score.pct >= min_master_score_pct
+    ]
+    advancing = qualifying[:max_pass_to_stage3]
+    ctx.stage3_queue = advancing
+    ctx.signals = []  # reset for Stage 3
+
+    advancing_symbols = {c.ticker.symbol for c in advancing}
+    logger.info(
+        f"[STAGE 1C] → Stage 3'e geçecek: "
+        f"{len(advancing)} (min_pct={min_master_score_pct}%, "
+        f"qualifying={len(qualifying)}, "
+        f"symbols={', '.join(advancing_symbols)})"
+    )
 
     return ctx

@@ -125,9 +125,9 @@ class FilterThresholds:
     min_avg_volume_10d: float
     min_daily_dollar_volume: float
     min_adr_pct: float = 2.0
-    require_close_above_ema21: bool = True
-    require_close_above_ema50: bool = True
-    require_green_day: bool = True      # Bugün > dün kapanışı
+    require_close_above_ema21: bool = False
+    require_close_above_ema50: bool = False
+    require_green_day: bool = False     # Puanlamaya taşındı (master_score c51-c53)
 
 
 @dataclass(slots=True)

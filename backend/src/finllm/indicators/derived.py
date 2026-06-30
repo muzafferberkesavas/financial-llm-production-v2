@@ -60,11 +60,17 @@ def compute_obv_divergence(
     elif not price_rising and obv_rising:
         divergence_type = "POSITIVE"
 
+    # EMA-weighted OBV trend: EMA(10) vs EMA(30)
+    obv_ema10 = float(obv.ewm(span=10, adjust=False).mean().iloc[-1]) if len(obv) >= 10 else None
+    obv_ema30 = float(obv.ewm(span=30, adjust=False).mean().iloc[-1]) if len(obv) >= 30 else None
+
     return {
         "trend": obv_trend,
         "divergence": divergence_type is not None,
         "type": divergence_type,
         "obv_ma20": obv_ma20,
+        "obv_ema10": obv_ema10,
+        "obv_ema30": obv_ema30,
     }
 
 

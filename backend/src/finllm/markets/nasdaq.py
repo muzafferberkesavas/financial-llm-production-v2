@@ -48,9 +48,6 @@ class NasdaqAdapter(MarketAdapter):
         min_avg_volume_10d=500_000,          # 500K shares/gün
         min_daily_dollar_volume=1_000_000,   # $1M günlük likidite
         min_adr_pct=2.0,
-        require_close_above_ema21=True,
-        require_close_above_ema50=True,
-        require_green_day=True,
     )
 
     # IBKR Lite / Robinhood komisyonsuz; spread + slippage kalıyor

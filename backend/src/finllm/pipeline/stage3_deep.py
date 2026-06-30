@@ -22,9 +22,9 @@ from finllm.pipeline.context import (
 from finllm.utils.logging import logger
 
 
-def _deep_one(client: LLMClient, cand: Candidate, agenda=None) -> ExtendedSignal:
+def _deep_one(client: LLMClient, cand: Candidate, agenda=None, kap_disclosures=None) -> ExtendedSignal:
     """Tek candidate için deep analysis → ExtendedSignal."""
-    data_block = build_data_block(cand, market_agenda=agenda)
+    data_block = build_data_block(cand, market_agenda=agenda, kap_disclosures=kap_disclosures)
     analysis = client.deep_analyze(data_block)
 
     # PriceScenarioOutput → PriceScenario (pipeline tip)
@@ -60,6 +60,7 @@ def _deep_one(client: LLMClient, cand: Candidate, agenda=None) -> ExtendedSignal
         confluence_score=cand.confluence_score,
         market_regime=cand.regime,
         weekly_trend=cand.indicators.get("weekly_trend", "UNKNOWN"),
+        master_score_pct=cand.master_score.pct if cand.master_score else None,
         llm_model=analysis.model,
         llm_cost_usd=analysis.cost_usd,
     )
@@ -83,7 +84,13 @@ def run_stage3(
 
     signals: list[ExtendedSignal] = []
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_deep_one, client, c, ctx.market_agenda): c for c in queue}
+        futures = {
+            pool.submit(
+                _deep_one, client, c, ctx.market_agenda,
+                kap_disclosures=ctx.kap_per_ticker.get(c.ticker.symbol.upper()),
+            ): c
+            for c in queue
+        }
         for fut in as_completed(futures):
             cand = futures[fut]
             try:
