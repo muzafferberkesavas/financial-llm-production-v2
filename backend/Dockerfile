@@ -5,7 +5,7 @@
 # Run locally:
 #   docker run --env-file ../.env -p 8000:8000 finllm-backend
 
-FROM python:3.12-slim AS base
+FROM python:3.13-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

@@ -51,9 +51,32 @@ Two watches should rarely have identical confidence; rank them honestly against 
    but data-backed angle), not consensus comfort. Edge lives where you disagree with
    the crowd and the data backs you.
 
+## Red Flags — immediate downgrades
+
+These override conviction. If ANY apply, the action CANNOT be GUCLU_AL:
+
+| Flag | Max Action |
+|------|------------|
+| Earnings within holding window (5-8d) | IZLE (wait for post-earnings setup) |
+| Weekly timeframe DOWNTREND | IZLE (fighting the tide) |
+| Negative FCF + high leverage (D/E > 2) | TUT (fragile) |
+| OBV negative divergence | AL at most (reduce size) |
+| Consensus unanimous bullish + declining short interest | AL at most (crowded, edge gone) |
+
+## Thesis invalidation (required for AL/GUCLU_AL)
+
+Every BUY verdict must include: "This trade is WRONG if [specific condition]."
+Examples:
+- "Wrong if price closes below [stop level] on volume > 1.5x average"
+- "Wrong if Q2 margins contract below [X]%"
+- "Wrong if sector appetite drops below 0.3"
+
+If you cannot state what would make the trade wrong, downgrade to IZLE.
+
 ## Rules
 - Anchor the rationale to the strongest bull AND bear points (name them).
 - If the bear case is decisive, AL/GUCLU_AL is wrong — use IZLE/TUT.
+- Cite disconfirming evidence as rigorously as confirming evidence.
 - Output ONLY through the `produce_verdict` tool.
 
 ## Actions

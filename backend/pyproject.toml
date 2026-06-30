@@ -2,7 +2,7 @@
 name = "finllm"
 version = "0.1.0"
 description = "Hybrid LLM + quant swing-trading signal system (US equities, BIST later)"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     # Core data
     # pandas 3.0'da breaking değişiklikler var; kod 2.2 API'sine yazılı → <3 sabitle.
@@ -94,7 +94,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "W", "UP", "N", "SIM"]
