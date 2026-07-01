@@ -133,7 +133,7 @@ def run_stage5(
         "signals": [_signal_to_dict(s) for s in ctx.signals],
     }
 
-    fpath.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+    fpath.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     logger.info(f"[STAGE 5] wrote {fpath} ({len(ctx.signals)} signals)")
 
     # Outcome tracker (JSONL) — backward-compat

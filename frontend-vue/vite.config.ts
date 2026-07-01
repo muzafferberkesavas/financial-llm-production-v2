@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": { target: API, changeOrigin: true, rewrite: (p) => p.replace(/^\/api/, "") },
+      "/api": { target: API, changeOrigin: true, rewrite: (p) => p.replace(/^\/api/, ""), timeout: 300000 },
     },
   },
 });

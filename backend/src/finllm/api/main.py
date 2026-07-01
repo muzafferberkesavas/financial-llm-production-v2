@@ -36,10 +36,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from finllm.api.routes import (
+    analyze,
     history,
     portfolio,
     signals,
     signals_db,
+    stock_detail,
     trigger,
     watchlist,
     ws_live,
@@ -121,6 +123,8 @@ app.include_router(portfolio.router)
 app.include_router(history.router)
 app.include_router(watchlist.router)
 app.include_router(trigger.router)
+app.include_router(analyze.router)
+app.include_router(stock_detail.router)
 app.include_router(ws_live.router)
 
 

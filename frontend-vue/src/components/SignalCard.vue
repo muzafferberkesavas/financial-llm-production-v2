@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import type { ExtendedSignal } from "@/types";
 import { ACTION_META } from "@/types";
 import GaugeRing from "./GaugeRing.vue";
@@ -7,9 +8,15 @@ import ActionBadge from "./ActionBadge.vue";
 
 const props = defineProps<{ signal: ExtendedSignal }>();
 const emit = defineEmits<{ open: [ExtendedSignal] }>();
+const router = useRouter();
 
 const tone = computed(() => ACTION_META[props.signal.signal].tone);
 const gaugeColor = computed(() => ({ bull: "#34d399", bear: "#f43f5e", watch: "#f0b454" }[tone.value]));
+
+function goToDetail(e: Event) {
+  e.stopPropagation();
+  router.push({ name: "stock-detail", params: { ticker: props.signal.ticker }, query: { market: props.signal.market } });
+}
 </script>
 
 <template>
@@ -20,7 +27,7 @@ const gaugeColor = computed(() => ({ bull: "#34d399", bear: "#f43f5e", watch: "#
     <header class="flex items-start justify-between gap-3">
       <div class="min-w-0">
         <div class="flex items-center gap-2">
-          <h3 class="num text-lg font-semibold tracking-tight">{{ signal.ticker }}</h3>
+          <h3 class="num text-lg font-semibold tracking-tight hover:text-accent hover:underline" @click="goToDetail($event)">{{ signal.ticker }}</h3>
           <span v-if="signal.sector" class="truncate text-[11px] text-muted">{{ signal.sector }}</span>
         </div>
         <div class="mt-0.5 flex items-center gap-2 text-[11px] text-faint">

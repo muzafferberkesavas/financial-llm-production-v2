@@ -21,7 +21,7 @@ onMounted(() => panel.load());
         </div>
 
         <nav class="flex items-center gap-1 rounded-xl border border-border bg-surface p-1 text-sm">
-          <RouterLink v-for="t in [['/overview','Genel'],['/signals','Sinyaller'],['/portfolio','Portföy']]" :key="t[0]"
+          <RouterLink v-for="t in [['/overview','Genel'],['/signals','Sinyaller'],['/portfolio','Portföy'],['/bist','BIST Hisseleri'],['/analyze','Analiz']]" :key="t[0]"
             :to="t[0]" class="rounded-lg px-3.5 py-1.5 text-muted transition hover:text-white"
             active-class="!bg-surface-3 !text-white">{{ t[1] }}</RouterLink>
         </nav>

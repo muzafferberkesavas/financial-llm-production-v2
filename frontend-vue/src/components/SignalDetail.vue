@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import type { ExtendedSignal } from "@/types";
 import { ACTION_META } from "@/types";
 import GaugeRing from "./GaugeRing.vue";
@@ -7,9 +8,16 @@ import ActionBadge from "./ActionBadge.vue";
 
 const props = defineProps<{ signal: ExtendedSignal | null }>();
 const emit = defineEmits<{ close: [] }>();
+const router = useRouter();
 
 const tone = computed(() => (props.signal ? ACTION_META[props.signal.signal].tone : "watch"));
 const gaugeColor = computed(() => ({ bull: "#34d399", bear: "#f43f5e", watch: "#f0b454" }[tone.value]));
+
+function goToDetail() {
+  if (!props.signal) return;
+  emit("close");
+  router.push({ name: "stock-detail", params: { ticker: props.signal.ticker }, query: { market: props.signal.market } });
+}
 </script>
 
 <template>
@@ -29,6 +37,11 @@ const gaugeColor = computed(() => ({ bull: "#34d399", bear: "#f43f5e", watch: "#
         </header>
 
         <div class="space-y-5 p-5">
+          <!-- Hisse Detay butonu -->
+          <button
+            class="w-full rounded-lg border border-border bg-surface-2 py-2 text-sm font-medium text-muted transition hover:bg-surface hover:text-text"
+            @click="goToDetail"
+          >Hisse Detayi &rarr;</button>
           <!-- key metrics -->
           <div class="flex items-center gap-4">
             <GaugeRing :value="signal.confidence" :color="gaugeColor" :size="92" label="güven" />
