@@ -4,7 +4,7 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 
 // Dev proxy: /api/* → backend panel_server (VITE_API_URL, default :8000).
-const API = process.env.VITE_API_URL ?? "http://localhost:8000";
+const API = process.env.VITE_API_URL ?? "http://localhost:8001";
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],

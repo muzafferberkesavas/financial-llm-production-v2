@@ -17,8 +17,8 @@ from finllm.pipeline.context import Candidate, PipelineContext
 from finllm.utils.logging import logger
 
 
-def _screen_one(client: LLMClient, cand: Candidate, agenda=None) -> Candidate:
-    data_block = build_data_block(cand, market_agenda=agenda)
+def _screen_one(client: LLMClient, cand: Candidate, agenda=None, kap_disclosures=None) -> Candidate:
+    data_block = build_data_block(cand, market_agenda=agenda, kap_disclosures=kap_disclosures)
     verdict = client.screen(data_block)
     cand.screen_verdict = verdict.verdict
     cand.screen_rationale = verdict.rationale
@@ -43,7 +43,13 @@ def run_stage2(
     logger.info(f"[STAGE 2] {ctx.market}: {len(active)} candidate screen ({client.name})")
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(_screen_one, client, c, ctx.market_agenda) for c in active]
+        futures = [
+            pool.submit(
+                _screen_one, client, c, ctx.market_agenda,
+                kap_disclosures=ctx.kap_per_ticker.get(c.ticker.symbol.upper()),
+            )
+            for c in active
+        ]
         for fut in as_completed(futures):
             try:
                 fut.result()

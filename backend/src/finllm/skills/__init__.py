@@ -13,7 +13,7 @@ def load_skill(name: str) -> str:
     skill_path = SKILLS_DIR / name / "SKILL.md"
     if not skill_path.exists():
         raise FileNotFoundError(f"Skill not found: {skill_path}")
-    return skill_path.read_text()
+    return skill_path.read_text(encoding="utf-8")
 
 
 __all__ = ["SKILLS_DIR", "load_skill"]

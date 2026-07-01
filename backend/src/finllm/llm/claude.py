@@ -94,8 +94,8 @@ DEEP_TOOL = {
             },
             "time_horizon_days": {
                 "type": ["integer", "null"],
-                "minimum": 1,
-                "maximum": 60,
+                "minimum": 5,
+                "maximum": 10,
             },
             "entry_zone_low": {"type": ["number", "null"]},
             "entry_zone_high": {"type": ["number", "null"]},
@@ -118,7 +118,7 @@ DEEP_TOOL = {
             "rationale_formation": {"type": "string", "maxLength": 400},
             "rationale_volume": {"type": "string", "maxLength": 400},
             "rationale_news": {"type": "string", "maxLength": 400},
-            "rationale_fibonacci": {"type": "string", "maxLength": 300},
+            "rationale_fibonacci": {"type": "string", "maxLength": 600},
             "rationale_risks": {
                 "type": "array",
                 "maxItems": 6,
@@ -126,8 +126,8 @@ DEEP_TOOL = {
             },
             "rationale_full": {
                 "type": "string",
-                "description": "3-5 cümle özet; full analyst-grade reasoning",
-                "maxLength": 1500,
+                "description": "3-4 paragraphs: detailed 10-day price action scenario with Fibonacci levels, support/resistance targets, base/bull/bear narratives. Readable analyst-report style.",
+                "maxLength": 4000,
             },
             "warning_flags": {
                 "type": "array",
@@ -324,7 +324,7 @@ class ClaudeDeepClient(_BaseClaudeClient, LLMClient):
                 user_content=user_content,
                 tools=[DEEP_TOOL],
                 tool_choice={"type": "tool", "name": "produce_analysis"},
-                max_tokens=2048,
+                max_tokens=4096,
             )
         except APIError as e:
             logger.error(f"[CLAUDE-DEEP] {ticker} API hatası: {e}")

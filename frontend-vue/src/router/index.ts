@@ -7,6 +7,7 @@ const routes = [
   { path: "/portfolio", name: "portfolio", component: () => import("@/views/PortfolioView.vue") },
   { path: "/bist", name: "bist-stocks", component: () => import("@/views/BistStocksView.vue") },
   { path: "/analyze", name: "analyze", component: () => import("@/views/AnalyzeView.vue") },
+  { path: "/notebook", name: "notebook", component: () => import("@/views/NotebookView.vue") },
   { path: "/stock/:ticker", name: "stock-detail", component: () => import("@/views/StockDetailView.vue"), props: true },
 ];
 

@@ -22,6 +22,12 @@ from finllm.data.news.base import (
 from finllm.data.news.finnhub_reader import FinnhubReader
 from finllm.data.news.kap_reader import KapReader
 from finllm.data.news.rss_reader import DEFAULT_SOURCES, RssReader
+from finllm.data.news.kap_cache import cleanup_expired, load_cached, save_cached
+from finllm.data.news.kap_translator import (
+    KAP_TYPE_MAP,
+    format_kap_section,
+    translate_disclosure,
+)
 from finllm.data.news.sec_reader import SecEdgarReader
 from finllm.data.news.translator import NewsTranslator
 
@@ -30,6 +36,7 @@ __all__ = [
     "DEFAULT_SOURCES",
     "FinnhubClient",
     "FinnhubReader",
+    "KAP_TYPE_MAP",
     "KapReader",
     "LegacyNewsItem",
     "MarketAgenda",
@@ -40,6 +47,11 @@ __all__ = [
     "NewsTranslator",
     "RssReader",
     "SecEdgarReader",
+    "cleanup_expired",
     "cleanup_text",
     "fetch_news",
+    "format_kap_section",
+    "load_cached",
+    "save_cached",
+    "translate_disclosure",
 ]

@@ -278,7 +278,27 @@ def build_data_block(
     timeframe_line = f"TIMEFRAME: Alignment={ind.get('timeframe_alignment', 'UNKNOWN')}"
 
     fib_zone = ind.get("fib_zone", "NO_FIB")
-    fib_line = f"FIB_ZONE: {fib_zone}"
+    # Fibonacci retracement fiyat seviyeleri
+    fib_parts = [f"Zone={fib_zone}"]
+    fib_supports = ind.get("fib_supports")
+    fib_resistances = ind.get("fib_resistances")
+    swing_h = ind.get("swing_high_20")
+    swing_l = ind.get("swing_low_20")
+    if swing_h is not None and swing_l is not None:
+        diff = swing_h - swing_l
+        if diff > 0:
+            fib_parts.append(f"SwingHigh={_f(swing_h)}")
+            fib_parts.append(f"SwingLow={_f(swing_l)}")
+            fib_parts.append(f"Fib_23.6%={_f(swing_h - diff * 0.236)}")
+            fib_parts.append(f"Fib_38.2%={_f(swing_h - diff * 0.382)}")
+            fib_parts.append(f"Fib_50.0%={_f(swing_h - diff * 0.500)}")
+            fib_parts.append(f"Fib_61.8%={_f(swing_h - diff * 0.618)}")
+            fib_parts.append(f"Fib_78.6%={_f(swing_h - diff * 0.786)}")
+    if fib_supports:
+        fib_parts.append(f"Supports={','.join(_f(s) for s in fib_supports[:4])}")
+    if fib_resistances:
+        fib_parts.append(f"Resistances={','.join(_f(r) for r in fib_resistances[:4])}")
+    fib_line = f"FIBONACCI: {' | '.join(fib_parts)}"
 
     swing_line = (
         f"SWING20: High={_f(ind.get('swing_high_20'))} | Low={_f(ind.get('swing_low_20'))}"

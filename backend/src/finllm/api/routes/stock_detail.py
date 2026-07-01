@@ -108,6 +108,37 @@ def _fetch_technicals(yahoo_symbol: str) -> dict | None:
         return None
 
 
+@router.get("/quote/{ticker}")
+def quick_quote(
+    ticker: str,
+    market: str = Query("bist", pattern="^(bist|nasdaq)$"),
+) -> dict:
+    """Hizli fiyat sorgulama — sadece son kapanis, degisim, tarih."""
+    from finllm.data.prices import fetch_prices
+
+    yahoo_symbol = f"{ticker}.IS" if market == "bist" else ticker
+    try:
+        df = fetch_prices(yahoo_symbol, start="2025-01-01")
+        if df.empty:
+            return {"ticker": ticker, "error": "Veri bulunamadi"}
+        last = df.iloc[-1]
+        prev = df.iloc[-2] if len(df) >= 2 else last
+        close = float(last["close"])
+        prev_close = float(prev["close"])
+        change_pct = ((close - prev_close) / prev_close * 100) if prev_close else 0
+        as_of = str(df.index[-1].date()) if hasattr(df.index[-1], "date") else str(df.index[-1])
+        return {
+            "ticker": ticker,
+            "market": market,
+            "price": round(close, 2),
+            "prev_close": round(prev_close, 2),
+            "change_pct": round(change_pct, 2),
+            "as_of": as_of,
+        }
+    except Exception as e:
+        return {"ticker": ticker, "error": str(e)}
+
+
 @router.get("/universe/bist")
 def list_bist_stocks() -> dict:
     """BIST-100 hisse listesi (sembol, isim, sektor)."""

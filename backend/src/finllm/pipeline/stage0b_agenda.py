@@ -22,6 +22,7 @@ from finllm.data.news import (
     SecEdgarReader,
 )
 from finllm.data.news.base import CorporateDisclosure, NewsItem
+from finllm.data.news.kap_translator import translate_disclosure
 from finllm.pipeline.context import PipelineContext
 from finllm.utils.logging import logger
 
@@ -142,18 +143,38 @@ def run_stage0b(
         f"{len(all_disclosures)} corporate disclosures"
     )
 
-    if not all_news and not all_disclosures:
-        logger.warning("[STAGE 0B] no news/disclosures, skipping translator")
+    # 3. Separate per-ticker vs macro disclosures
+    per_ticker: dict[str, list[CorporateDisclosure]] = {}
+    macro_disclosures: list[CorporateDisclosure] = []
+
+    for disc in all_disclosures:
+        ticker_key = disc.ticker.upper().strip() if disc.ticker else ""
+        if ticker_key:
+            per_ticker.setdefault(ticker_key, []).append(disc)
+        else:
+            macro_disclosures.append(disc)
+
+    # Store per-ticker KAP disclosures (rule-based translation, no LLM cost)
+    ctx.kap_per_ticker = per_ticker
+    if per_ticker:
+        total_per = sum(len(v) for v in per_ticker.values())
+        logger.info(
+            f"[STAGE 0B] per-ticker KAP: {total_per} disclosures "
+            f"across {len(per_ticker)} tickers (rule-based TR→EN)"
+        )
+
+    if not all_news and not macro_disclosures:
+        logger.warning("[STAGE 0B] no news/macro disclosures, skipping translator")
         ctx.market_agenda = None
         ctx.log_stage("stage0b_agenda", time.perf_counter() - started)
         return ctx
 
-    # 3. Claude Haiku ile MARKET AGENDA üret
+    # 4. Claude Haiku ile MARKET AGENDA üret (only macro/market-wide content)
     try:
         translator = NewsTranslator()
         agenda = translator.translate(
             news=all_news,
-            disclosures=all_disclosures,
+            disclosures=macro_disclosures,
             watchlist=watchlist_symbols,
             use_cache=True,
         )
