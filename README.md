@@ -1,5 +1,13 @@
 # Financial LLM Production
 
+> **English summary.** A hybrid **LLM + quant** swing-trading signal system for US equities (with BIST and gold in the roadmap).
+> The backend pulls price data, computes 50+ technical indicators, scores news sentiment with FinBERT, and runs a multi-LLM
+> ensemble (Claude + OpenAI) that votes on daily BUY / SELL / HOLD signals. A FastAPI + DuckDB service generates signals and
+> manages a risk-limited portfolio; an optional GPU service hosts FinBERT / FinGPT and a RAG index over SEC filings; a Next.js 16
+> dashboard renders the signals with streaming Claude analysis. The architecture follows a four-layer funnel
+> (data perception → reasoning engine → strategy generation → execution and control) with a backtest gate as the core control,
+> documented with sources in [`ARCHITECTURE.md`](ARCHITECTURE.md). Solo project; the docs below are in Turkish.
+
 Hibrit **LLM + quant** swing-trading sinyal sistemi. ABD hisseleri için fiyat/teknik göstergeler + haber sentiment'i + çoklu LLM ensemble voting ile günlük AL/SAT sinyalleri üretir, DuckDB'de portföy tutar, Next.js dashboard'dan gösterir.
 
 ---
